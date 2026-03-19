@@ -1,0 +1,313 @@
+<div class="page-header">
+  <div class="page-title">
+    <h1>Mes Assignments</h1>
+    <p>Gérez vos devoirs ({{totalDocs}})</p>
+  </div>
+  <div class="header-actions">
+    <div class="filters-container">
+      <div class="search-input-group">
+        <span class="material-icons">search</span>
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          (input)="onSearch()"
+          placeholder="Rechercher..."
+        >
+      </div>
+
+      <select [(ngModel)]="filterStatus" (change)="onSearch()" class="status-select">
+        <option value="">Tous les statuts</option>
+        <option value="true">Terminé</option>
+        <option value="false">À faire</option>
+      </select>
+    </div>
+
+    <button class="btn-add" (click)="openModal()">
+      <span class="material-icons">add</span>
+      Nouveau
+    </button>
+  </div>
+</div>
+
+<div class="assignments-card">
+  <div class="table-responsive">
+    <table class="modern-table">
+      <thead>
+        <tr>
+          <th>Matière</th>
+          <th>Assignment</th>
+          <th>Auteur</th>
+          <th>Date de rendu</th>
+          <th style="text-align: center;">Statut</th>
+          <th style="text-align: center;">Note</th>
+          <th style="text-align: center;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let a of assignments">
+          <td>
+            <div class="subject-display">
+              <div class="subject-visual">
+                <img *ngIf="a.imageMatiere" [src]="a.imageMatiere" alt="Matière" class="subject-img" onerror="this.style.display='none'">
+                <div class="subject-icon-box" [style.background-color]="getSubjectColor(a.matiere) + '15'" [style.color]="getSubjectColor(a.matiere)">
+                  <span class="material-icons">{{ getSubjectIcon(a.matiere) }}</span>
+                </div>
+              </div>
+              <span class="subject-name-text">{{a.matiere}}</span>
+            </div>
+          </td>
+          <td>
+            <div style="font-weight: 700;">{{a.nom}}</div>
+            <div style="font-size: 0.75rem; color: #7f8c8d;">Prof: {{a.prof}}</div>
+          </td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div class="avatar">{{ getInitials(a.auteur) }}</div>
+              <span>{{a.auteur}}</span>
+            </div>
+          </td>
+          <td>{{ a.dateDeRendu | date:'dd/MM/yyyy' }}</td>
+          <td style="text-align: center;">
+            <div class="status-chip" [ngClass]="a.rendu ? 'chip-done' : 'chip-pending'">
+              <span class="dot"></span>
+              {{ a.rendu ? 'Terminé' : 'À faire' }}
+            </div>
+          </td>
+          <td style="text-align: center;">
+            <span *ngIf="a.rendu; else noNote" class="note-badge" [ngClass]="getNoteClass(a.note)">{{a.note}}/20</span>
+            <ng-template #noNote><span style="color: #cbd5e0;">-</span></ng-template>
+          </td>
+          <td style="text-align: center;">
+            <div class="action-buttons">
+              <button class="btn-icon view" (click)="onViewDetails(a)" title="Voir les détails">
+                <span class="material-icons">visibility</span>
+              </button>
+
+              <ng-container *ngIf="auth.isAdmin() || a.auteur === auth.getUsername()">
+                <button class="btn-icon edit" (click)="openModal(a)" title="Modifier">
+                  <span class="material-icons">edit</span>
+                </button>
+                <button class="btn-icon delete" (click)="onDeleteAssignment(a._id)" title="Supprimer">
+                  <span class="material-icons">delete</span>
+                </button>
+              </ng-container>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pagination-footer" *ngIf="totalPages > 1">
+    <span class="pagination-info">Page {{page}} sur {{totalPages}} ({{totalDocs}} devoirs)</span>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn-pagination" (click)="previousPage()" [disabled]="page === 1">Précédent</button>
+      <button class="btn-pagination" (click)="nextPage()" [disabled]="page === totalPages">Suivant</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Détails -->
+<div class="modal-overlay" *ngIf="showDetailModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2>Détails du Devoir</h2>
+      <button class="btn-close" (click)="closeDetailModal()"><span class="material-icons">close</span></button>
+    </div>
+    <div class="modal-body" *ngIf="selectedAssignment">
+      <div class="detail-header-visual">
+        <div class="detail-subject-image">
+          <img *ngIf="selectedAssignment.imageMatiere" [src]="selectedAssignment.imageMatiere" alt="Image Matière" onerror="this.style.display='none'">
+          <div class="detail-icon-fallback" [style.color]="getSubjectColor(selectedAssignment.matiere)">
+            <span class="material-icons">{{ getSubjectIcon(selectedAssignment.matiere) }}</span>
+          </div>
+        </div>
+        <div class="detail-title-group">
+          <h3>{{ selectedAssignment.nom }}</h3>
+          <span class="subject-badge" [style.background-color]="getSubjectColor(selectedAssignment.matiere) + '20'" [style.color]="getSubjectColor(selectedAssignment.matiere)">
+            {{ selectedAssignment.matiere }}
+          </span>
+        </div>
+      </div>
+
+      <div class="modal-form-grid">
+        <div class="modal-form-group">
+          <label class="modal-label">Auteur</label>
+          <div style="font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+            <div class="avatar" style="width: 28px; height: 28px; font-size: 0.7rem;">{{ getInitials(selectedAssignment.auteur) }}</div>
+            {{ selectedAssignment.auteur }}
+          </div>
+        </div>
+        <div class="modal-form-group">
+          <label class="modal-label">Professeur</label>
+          <div style="font-weight: 600; color: #1e293b;">M. {{ selectedAssignment.prof }}</div>
+        </div>
+        <div class="modal-form-group">
+          <label class="modal-label">Date de rendu</label>
+          <div style="font-weight: 600; color: #1e293b;">{{ selectedAssignment.dateDeRendu | date:'longDate' }}</div>
+        </div>
+        <div class="modal-form-group">
+          <label class="modal-label">Statut</label>
+          <div class="status-chip" [ngClass]="selectedAssignment.rendu ? 'chip-done' : 'chip-pending'">
+            <span class="dot"></span>
+            {{ selectedAssignment.rendu ? 'Terminé' : 'En attente' }}
+          </div>
+        </div>
+
+        <div class="full-width" style="background: #f8fafc; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;" *ngIf="selectedAssignment.rendu">
+          <label class="modal-label" style="margin-bottom: 0;">Note Finale</label>
+          <div style="font-size: 1.75rem; font-weight: 900; color: #1e293b;">{{ selectedAssignment.note }} <span style="font-size: 1rem; color: #94a3b8;">/ 20</span></div>
+        </div>
+
+        <div class="full-width" *ngIf="selectedAssignment.remarques">
+          <label class="modal-label">Remarques du Professeur</label>
+          <p style="margin: 0; font-style: italic; color: #475569; line-height: 1.5; background: #fff; padding: 12px; border-radius: 8px; border-left: 4px solid #cbd5e0;">"{{ selectedAssignment.remarques }}"</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" (click)="closeDetailModal()" style="width: auto; padding-left: 32px; padding-right: 32px;">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nouveau/Modifier avec Stepper -->
+<div class="modal-overlay" *ngIf="showModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2>{{ isEditMode ? 'Modifier l\'Assignment' : 'Nouvel Assignment' }}</h2>
+      <button class="btn-close" (click)="closeModal()"><span class="material-icons">close</span></button>
+    </div>
+
+    <div class="stepper-header">
+      <div class="step" [class.active]="currentStep >= 1">
+        <div class="step-circle">1</div>
+        <span class="step-label">Général</span>
+      </div>
+      <div class="step-line" [class.active]="currentStep >= 2"></div>
+      <div class="step" [class.active]="currentStep >= 2">
+        <div class="step-circle">2</div>
+        <span class="step-label">Détails</span>
+      </div>
+      <div class="step-line" [class.active]="currentStep >= 3"></div>
+      <div class="step" [class.active]="currentStep >= 3">
+        <div class="step-circle">3</div>
+        <span class="step-label">Finalisation</span>
+      </div>
+    </div>
+
+    <form (submit)="onSaveAssignment(); $event.preventDefault()">
+      <div class="modal-body stepper-body">
+
+        <div class="step-content" *ngIf="currentStep === 1">
+          <div class="modal-form-grid">
+            <div class="modal-form-group full-width">
+              <label class="modal-label">Nom du devoir</label>
+              <div class="modal-input-wrapper">
+                <span class="material-icons">description</span>
+                <input [(ngModel)]="newAssignment.nom" name="nom" placeholder="ex: Devoir de Mathématiques" required>
+              </div>
+            </div>
+            <div class="modal-form-group full-width">
+              <label class="modal-label">Auteur (Élève)</label>
+              <div class="modal-input-wrapper">
+                <span class="material-icons">person</span>
+                <input [(ngModel)]="newAssignment.auteur"
+                       name="auteur"
+                       [readonly]="!auth.isAdmin()"
+                       [style.background-color]="!auth.isAdmin() ? '#f1f5f9' : 'white'"
+                       placeholder="Nom de l'élève"
+                       required>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-content" *ngIf="currentStep === 2">
+          <div class="modal-form-grid">
+            <div class="modal-form-group full-width">
+              <label class="modal-label">Choisir la Matière</label>
+              <div class="subject-grid-selection">
+                <div *ngFor="let s of availableSubjects"
+                     class="subject-select-card"
+                     [class.selected]="newAssignment.matiere === s.name"
+                     (click)="newAssignment.matiere = s.name; onSubjectChange()">
+                  <div class="subject-card-icon" [style.background-color]="s.color + '15'" [style.color]="s.color">
+                    <span class="material-icons">{{ s.icon }}</span>
+                  </div>
+                  <span class="subject-card-name">{{ s.name }}</span>
+                  <div class="selected-check" *ngIf="newAssignment.matiere === s.name">
+                    <span class="material-icons">check_circle</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-form-group">
+              <label class="modal-label">Professeur Responsable</label>
+              <div class="modal-input-wrapper">
+                <span class="material-icons">school</span>
+                <input [(ngModel)]="newAssignment.prof" name="prof" placeholder="Sélectionnez une matière" readonly style="background-color: #f8fafc; border-style: dashed;">
+              </div>
+            </div>
+            <div class="modal-form-group">
+              <label class="modal-label">Aperçu de l'image</label>
+              <div class="subject-preview-mini" [style.border-color]="getSubjectColor(newAssignment.matiere)">
+                <img *ngIf="newAssignment.imageMatiere" [src]="newAssignment.imageMatiere" alt="Preview">
+                <div *ngIf="!newAssignment.imageMatiere" class="no-preview">
+                  <span class="material-icons">image_not_supported</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-content" *ngIf="currentStep === 3">
+          <div class="modal-form-grid">
+            <div class="modal-form-group" [class.full-width]="!isEditMode || !auth.isAdmin()">
+              <label class="modal-label">Date de rendu</label>
+              <div class="modal-input-wrapper">
+                <span class="material-icons">event</span>
+                <input type="date" [(ngModel)]="newAssignment.dateDeRendu" name="dateDeRendu" required>
+              </div>
+            </div>
+
+            <ng-container *ngIf="isEditMode && auth.isAdmin()">
+              <div class="modal-form-group">
+                <label class="modal-label">Note (/20)</label>
+                <div class="modal-input-wrapper">
+                  <span class="material-icons">grade</span>
+                  <input type="number" [(ngModel)]="newAssignment.note" name="note" min="0" max="20" placeholder="--">
+                </div>
+              </div>
+            </ng-container>
+
+            <div class="modal-form-group full-width">
+              <label class="modal-label">Remarques</label>
+              <div class="modal-input-wrapper">
+                <textarea [(ngModel)]="newAssignment.remarques" name="remarques" style="min-height: 80px; padding-left: 12px;" placeholder="Commentaires éventuels..."></textarea>
+              </div>
+            </div>
+
+            <div class="modal-form-group full-width" *ngIf="isEditMode">
+              <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 12px; border-radius: 12px; background: #f8fafc; border: 1.5px solid #e2e8f0;">
+                <input type="checkbox" [(ngModel)]="newAssignment.rendu" name="rendu" style="width: 20px; height: 20px; margin: 0;">
+                <span style="font-weight: 700; color: #1e293b;">Marquer comme rendu</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="closeModal()" *ngIf="currentStep === 1">Annuler</button>
+        <button type="button" class="btn-secondary" (click)="previousStep()" *ngIf="currentStep > 1">Précédent</button>
+
+        <button type="button" class="btn-primary" (click)="nextStep()" *ngIf="currentStep < 3" [disabled]="currentStep === 2 && !newAssignment.matiere">Suivant</button>
+        <button type="submit" class="btn-primary" *ngIf="currentStep === 3" [disabled]="!newAssignment.nom || !newAssignment.auteur">
+          {{ isEditMode ? 'Sauvegarder' : 'Créer l\'assignment' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

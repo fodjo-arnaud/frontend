@@ -1,0 +1,163 @@
+/* Global Styles & Reset */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Navbar - Corrigée pour le scroll */
+.navbar {
+  background-color: #ffffff; /* Fond blanc pur et opaque */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  padding: 0.75rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10000; /* Assure que la navbar est au-dessus de tout (tableaux, boutons, etc.) */
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.navbar-brand {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navbar-brand .material-icons { color: #2563eb; }
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.btn-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #1e293b;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.btn-profile:hover { background-color: #f1f5f9; }
+
+.profile-avatar-small {
+  width: 32px;
+  height: 32px;
+  background: #2563eb;
+  color: white;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.8rem;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  background-color: #e2e8f0;
+}
+
+.btn-logout {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-logout:hover { background-color: #fee2e2; color: #dc2626; }
+
+.main-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* SnackBar / Notifications Position Bas Milieu */
+.snackbar-container {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 11000;
+  pointer-events: none;
+  animation: snackbarSlideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.snackbar {
+  min-width: 300px;
+  padding: 14px 24px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+  background: #1e293b;
+  color: white;
+  pointer-events: auto;
+}
+
+.snackbar-message { font-weight: 700; font-size: 0.95rem; }
+
+.snackbar-success { border-bottom: 5px solid #22c55e; }
+.snackbar-error { border-bottom: 5px solid #ef4444; }
+.snackbar-info { border-bottom: 5px solid #3b82f6; }
+
+@keyframes snackbarSlideUp {
+  from { transform: translate(-50%, 100%) scale(0.8); opacity: 0; }
+  to { transform: translate(-50%, 0) scale(1); opacity: 1; }
+}
+
+/* Modals Shared */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.modal-card {
+  background: white;
+  width: 95%;
+  max-width: 650px;
+  border-radius: 20px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}

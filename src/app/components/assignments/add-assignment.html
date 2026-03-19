@@ -1,0 +1,57 @@
+<div class="modal-overlay" *ngIf="showModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2>Nouvel Assignment</h2>
+      <button class="btn-close" (click)="closeModal()">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+
+    <form (submit)="onAddAssignment(); $event.preventDefault()">
+      <div class="form-group">
+        <label for="nom">Nom du devoir</label>
+        <div class="input-with-icon">
+          <span class="material-icons">description</span>
+          <input [(ngModel)]="newAssignment.nom" name="nom" id="nom" placeholder="ex: Devoir de Maths" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="auteur">Auteur</label>
+        <div class="input-with-icon">
+          <span class="material-icons">person</span>
+          <input [(ngModel)]="newAssignment.auteur" name="auteur" id="auteur" placeholder="Votre nom" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="matiere">Matière</label>
+        <div class="input-with-icon">
+          <span class="material-icons">book</span>
+          <input [(ngModel)]="newAssignment.matiere" name="matiere" id="matiere" placeholder="ex: Mathématiques" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="prof">Professeur</label>
+        <div class="input-with-icon">
+          <span class="material-icons">school</span>
+          <input [(ngModel)]="newAssignment.prof" name="prof" id="prof" placeholder="ex: M. Dupont" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="note">Note (/20)</label>
+        <div class="input-with-icon">
+          <span class="material-icons">grade</span>
+          <input type="number" [(ngModel)]="newAssignment.note" name="note" id="note" min="0" max="20" placeholder="18" required>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Annuler</button>
+        <button type="submit" class="btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>

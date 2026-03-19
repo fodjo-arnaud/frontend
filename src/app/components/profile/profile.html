@@ -1,0 +1,99 @@
+<div class="profile-page">
+  <div class="profile-container">
+    <div class="profile-card profile-info">
+      <div class="profile-header">
+        <button class="btn-back" (click)="goBack()">
+          <span class="material-icons">arrow_back</span>
+        </button>
+        <h2>Mon Profil</h2>
+      </div>
+
+      <div class="user-display">
+        <div class="user-avatar">
+          <span class="material-icons">account_circle</span>
+        </div>
+        <div class="user-meta">
+          <h3>{{ username }}</h3>
+          <span class="role-badge" [class.admin]="auth.isAdmin()">
+            {{ role }}
+          </span>
+        </div>
+      </div>
+
+      <div class="profile-stats">
+        <div class="stat-item">
+          <span class="stat-label">Dernière Connexion</span>
+          <span class="stat-value" *ngIf="lastLogin">
+            {{ lastLogin | date:'medium' }}
+          </span>
+          <span class="stat-value" *ngIf="!lastLogin">
+            Première connexion
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-card password-section">
+      <div class="section-title">
+        <span class="material-icons">security</span>
+        <h3>Sécurité & Mot de passe</h3>
+      </div>
+      <p class="section-desc">Mettez à jour votre mot de passe pour sécuriser votre compte.</p>
+
+      <form (submit)="onChangePassword(); $event.preventDefault()">
+        <div class="form-group">
+          <label>Mot de passe actuel</label>
+          <div class="input-wrapper">
+            <span class="material-icons">lock_open</span>
+            <input
+              [type]="showPasswords.current ? 'text' : 'password'"
+              [(ngModel)]="passwords.current"
+              name="current"
+              placeholder="Mot de passe actuel"
+            >
+            <button type="button" class="btn-toggle" (click)="togglePassword('current')">
+              <span class="material-icons">{{ showPasswords.current ? 'visibility_off' : 'visibility' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Nouveau mot de passe</label>
+          <div class="input-wrapper">
+            <span class="material-icons">vpn_key</span>
+            <input
+              [type]="showPasswords.new ? 'text' : 'password'"
+              [(ngModel)]="passwords.new"
+              name="new"
+              placeholder="Nouveau mot de passe"
+            >
+            <button type="button" class="btn-toggle" (click)="togglePassword('new')">
+              <span class="material-icons">{{ showPasswords.new ? 'visibility_off' : 'visibility' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Confirmer le nouveau mot de passe</label>
+          <div class="input-wrapper">
+            <span class="material-icons">done_all</span>
+            <input
+              [type]="showPasswords.confirm ? 'text' : 'password'"
+              [(ngModel)]="passwords.confirm"
+              name="confirm"
+              placeholder="Confirmer"
+            >
+            <button type="button" class="btn-toggle" (click)="togglePassword('confirm')">
+              <span class="material-icons">{{ showPasswords.confirm ? 'visibility_off' : 'visibility' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-update-password" [disabled]="!passwords.new || !passwords.confirm">
+          <span class="material-icons">save</span>
+          Enregistrer le nouveau mot de passe
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
