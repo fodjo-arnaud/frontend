@@ -9,9 +9,9 @@ body {
   color: #0f172a;
 }
 
-/* Navbar - Corrigée pour le scroll */
+/* Navbar - Priorité pour le scroll uniquement */
 .navbar {
-  background-color: #ffffff; /* Fond blanc pur et opaque */
+  background-color: #ffffff;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   padding: 0.75rem 2rem;
   display: flex;
@@ -19,7 +19,7 @@ body {
   align-items: center;
   position: sticky;
   top: 0;
-  z-index: 10000; /* Assure que la navbar est au-dessus de tout (tableaux, boutons, etc.) */
+  z-index: 1000; /* Assez haut pour le scroll, mais bas pour les pop-ups */
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -107,7 +107,7 @@ body {
   bottom: 30px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 11000;
+  z-index: 10000; /* Au dessus de tout */
   pointer-events: none;
   animation: snackbarSlideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -136,19 +136,21 @@ body {
   to { transform: translate(-50%, 0) scale(1); opacity: 1; }
 }
 
-/* Modals Shared */
+/* Modals Shared - RE-FIXÉ pour passer devant la navbar */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
   background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(8px);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 10000;
+  z-index: 9999; /* Très supérieur au z-index de la navbar (1000) */
 }
 
 .modal-card {
