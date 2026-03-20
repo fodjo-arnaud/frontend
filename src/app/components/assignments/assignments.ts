@@ -5,6 +5,7 @@ import { AssignmentService } from '../../services/assignment';
 import { AuthService } from '../../services/auth';
 import { NotificationService } from '../../services/notification';
 import { DirectoryService, SubjectItem } from '../../services/directory';
+import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'app-assignments',
@@ -17,17 +18,13 @@ export class AssignmentsComponent implements OnInit {
 
   assignments: any[] = [];
   showModal = false;
+  showDetailModal = false;
+  showSubjectModal = false;
   isEditMode = false;
   currentEditId = '';
   currentStep = 1;
 
-  // Statistiques
-  stats = {
-    total: 0,
-    done: 0,
-    pending: 0
-  };
-
+  stats = { total: 0, done: 0, pending: 0 };
   availableSubjects: SubjectItem[] = [];
   availableStudents: any[] = [];
 
@@ -35,22 +32,19 @@ export class AssignmentsComponent implements OnInit {
   limit = 20;
   totalDocs = 0;
   totalPages = 1;
-
   searchQuery = '';
   filterStatus = '';
-  showDetailModal = false;
   selectedAssignment: any = null;
 
   newAssignment: any = {
+    nom: '', auteur: '', matiere: '', prof: '', note: null,
+    dateDeRendu: '', imageMatiere: '', rendu: false, remarques: '', priorite: 'moyenne'
+  };
+
+  newSubject: any = {
     nom: '',
-    auteur: '',
-    matiere: '',
     prof: '',
-    note: null,
-    dateDeRendu: '',
-    imageMatiere: '',
-    rendu: false,
-    remarques: ''
+    image: ''
   };
 
   constructor(
@@ -58,68 +52,107 @@ export class AssignmentsComponent implements OnInit {
     public auth: AuthService,
     private cd: ChangeDetectorRef,
     private notifService: NotificationService,
-    private directoryService: DirectoryService
+    private directoryService: DirectoryService,
+    private http: HttpClient
   ) {}
 
   ngOnInit() {
     this.refreshAssignments();
-    this.availableSubjects = this.directoryService.getSubjects();
+    this.loadSubjects();
     this.availableStudents = this.directoryService.getStudents();
   }
 
+  loadSubjects() {
+    this.http.get<any[]>('http://localhost:3000/api/subjects').subscribe({
+      next: (data) => {
+        if (data && data.length > 0) {
+          const backendSubjects = data.map(s => ({
+            name: s.nom,
+            prof: s.prof,
+            image: s.image,
+            icon: 'book',
+            color: '#3b82f6'
+          }));
+          this.availableSubjects = [...this.directoryService.getSubjects(), ...backendSubjects];
+        } else {
+          this.availableSubjects = this.directoryService.getSubjects();
+        }
+        this.cd.detectChanges();
+      },
+      error: () => {
+        this.availableSubjects = this.directoryService.getSubjects();
+      }
+    });
+  }
+
   onSubjectChange() {
-    const subject = this.directoryService.getSubjectByName(this.newAssignment.matiere);
+    const subject = this.availableSubjects.find(s => s.name === this.newAssignment.matiere);
     if (subject) {
       this.newAssignment.prof = subject.prof;
       this.newAssignment.imageMatiere = subject.image || '';
-      this.notifService.show(`Matière sélectionnée : ${subject.name}`, 'info');
     }
   }
 
   refreshAssignments() {
     const authorFilter = this.auth.isAdmin() ? '' : this.auth.getUsername();
-
     this.assignmentService.getAssignments(this.page, this.limit, this.searchQuery, this.filterStatus, authorFilter).subscribe((data: any) => {
       if (data && data.docs) {
         this.assignments = data.docs;
         this.totalDocs = data.totalDocs;
         this.totalPages = data.totalPages;
-
-        // Calcul des stats (pour une démo, on peut aussi les recevoir du backend)
-        this.calculateStats();
+        if (data.stats) this.stats = data.stats;
       }
       this.cd.detectChanges();
     });
   }
 
-  calculateStats() {
-    this.stats.total = this.totalDocs;
-    // Ici on simule car on n'a que les données de la page actuelle
-    // Dans un vrai projet, le backend renverrait ces 3 chiffres
-    this.stats.done = this.assignments.filter(a => a.rendu).length;
-    this.stats.pending = this.stats.total - this.stats.done;
-  }
-
-  onSearch() {
-    this.page = 1;
-    this.refreshAssignments();
-  }
-
+  onSearch() { this.page = 1; this.refreshAssignments(); }
   nextPage() { if (this.page < this.totalPages) { this.page++; this.refreshAssignments(); } }
   previousPage() { if (this.page > 1) { this.page--; this.refreshAssignments(); } }
+
+  nextStep() { if (this.currentStep < 3) this.currentStep++; this.cd.detectChanges(); }
+  previousStep() { if (this.currentStep > 1) this.currentStep--; this.cd.detectChanges(); }
 
   onViewDetails(assignment: any) {
     this.selectedAssignment = { ...assignment };
     this.showDetailModal = true;
+    this.cd.detectChanges();
   }
 
   closeDetailModal() {
     this.showDetailModal = false;
     this.selectedAssignment = null;
+    this.cd.detectChanges();
   }
 
-  nextStep() { if (this.currentStep < 3) this.currentStep++; }
-  previousStep() { if (this.currentStep > 1) this.currentStep--; }
+  openSubjectModal() {
+    this.newSubject = { nom: '', prof: '', image: '' };
+    this.showSubjectModal = true;
+    this.cd.detectChanges();
+  }
+
+  closeSubjectModal() {
+    this.showSubjectModal = false;
+    this.cd.detectChanges();
+  }
+
+  saveSubject() {
+    if (!this.newSubject.nom || !this.newSubject.prof || !this.newSubject.image) {
+      this.notifService.show('Veuillez remplir tous les champs', 'error');
+      return;
+    }
+
+    this.http.post('http://localhost:3000/api/subjects', this.newSubject).subscribe({
+      next: () => {
+        this.notifService.show('Matière enregistrée avec succès', 'success');
+        this.closeSubjectModal();
+        this.loadSubjects();
+      },
+      error: () => {
+        this.notifService.show('Erreur lors de l\'enregistrement', 'error');
+      }
+    });
+  }
 
   openModal(assignment?: any) {
     this.currentStep = 1;
@@ -133,20 +166,23 @@ export class AssignmentsComponent implements OnInit {
     } else {
       this.isEditMode = false;
       this.resetForm();
-      if (!this.auth.isAdmin()) {
-        this.newAssignment.auteur = this.auth.getUsername();
-      }
+      if (!this.auth.isAdmin()) { this.newAssignment.auteur = this.auth.getUsername(); }
     }
     this.showModal = true;
+    this.cd.detectChanges();
   }
 
   closeModal() {
     this.showModal = false;
     this.resetForm();
+    this.cd.detectChanges();
   }
 
   resetForm() {
-    this.newAssignment = { nom: '', auteur: '', matiere: '', prof: '', note: null, dateDeRendu: '', imageMatiere: '', rendu: false, remarques: '' };
+    this.newAssignment = {
+      nom: '', auteur: '', matiere: '', prof: '', note: null,
+      dateDeRendu: '', imageMatiere: '', rendu: false, remarques: '', priorite: 'moyenne'
+    };
     this.isEditMode = false;
     this.currentEditId = '';
     this.currentStep = 1;
@@ -154,16 +190,15 @@ export class AssignmentsComponent implements OnInit {
 
   onSaveAssignment() {
     if (!this.newAssignment.nom || !this.newAssignment.auteur) return;
-
     if (this.isEditMode) {
       this.assignmentService.updateAssignment(this.currentEditId, this.newAssignment).subscribe(() => {
-        this.notifService.show('Sauvegardé !', 'success');
+        this.notifService.show('Assignment mis à jour', 'success');
         this.closeModal();
         this.refreshAssignments();
       });
     } else {
       this.assignmentService.addAssignment(this.newAssignment).subscribe(() => {
-        this.notifService.show('Créé !', 'success');
+        this.notifService.show('Nouvel assignment créé', 'success');
         this.closeModal();
         this.refreshAssignments();
       });
@@ -191,12 +226,12 @@ export class AssignmentsComponent implements OnInit {
   }
 
   getSubjectIcon(subject: string): string {
-    const s = this.directoryService.getSubjectByName(subject);
+    const s = this.availableSubjects.find(sub => sub.name === subject);
     return s ? s.icon : 'menu_book';
   }
 
   getSubjectColor(subject: string): string {
-    const s = this.directoryService.getSubjectByName(subject);
+    const s = this.availableSubjects.find(sub => sub.name === subject);
     return s ? s.color : '#718096';
   }
 }
