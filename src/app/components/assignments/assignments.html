@@ -1,9 +1,35 @@
 <div class="page-header">
   <div class="page-title">
     <h1>Mes Assignments</h1>
-    <p>Gérez vos devoirs ({{totalDocs}})</p>
+    <p>Gérez vos devoirs efficacement</p>
   </div>
+
   <div class="header-actions">
+    <!-- Barre de statistiques -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <span class="material-icons" style="color: #2563eb;">assignment</span>
+        <div class="stat-info">
+          <span class="stat-count">{{totalDocs}}</span>
+          <span class="stat-name">Total</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="material-icons" style="color: #22c55e;">check_circle</span>
+        <div class="stat-info">
+          <span class="stat-count">{{stats.done}}</span>
+          <span class="stat-name">Finis</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="material-icons" style="color: #f59e0b;">pending_actions</span>
+        <div class="stat-info">
+          <span class="stat-count">{{stats.pending}}</span>
+          <span class="stat-name">À faire</span>
+        </div>
+      </div>
+    </div>
+
     <div class="filters-container">
       <div class="search-input-group">
         <span class="material-icons">search</span>

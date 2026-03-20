@@ -21,6 +21,13 @@ export class AssignmentsComponent implements OnInit {
   currentEditId = '';
   currentStep = 1;
 
+  // Statistiques
+  stats = {
+    total: 0,
+    done: 0,
+    pending: 0
+  };
+
   availableSubjects: SubjectItem[] = [];
   availableStudents: any[] = [];
 
@@ -70,7 +77,6 @@ export class AssignmentsComponent implements OnInit {
   }
 
   refreshAssignments() {
-    // RESTRICTION : Si pas admin, on ne demande que ses propres devoirs
     const authorFilter = this.auth.isAdmin() ? '' : this.auth.getUsername();
 
     this.assignmentService.getAssignments(this.page, this.limit, this.searchQuery, this.filterStatus, authorFilter).subscribe((data: any) => {
@@ -78,9 +84,20 @@ export class AssignmentsComponent implements OnInit {
         this.assignments = data.docs;
         this.totalDocs = data.totalDocs;
         this.totalPages = data.totalPages;
+
+        // Calcul des stats (pour une démo, on peut aussi les recevoir du backend)
+        this.calculateStats();
       }
       this.cd.detectChanges();
     });
+  }
+
+  calculateStats() {
+    this.stats.total = this.totalDocs;
+    // Ici on simule car on n'a que les données de la page actuelle
+    // Dans un vrai projet, le backend renverrait ces 3 chiffres
+    this.stats.done = this.assignments.filter(a => a.rendu).length;
+    this.stats.pending = this.stats.total - this.stats.done;
   }
 
   onSearch() {
@@ -116,8 +133,6 @@ export class AssignmentsComponent implements OnInit {
     } else {
       this.isEditMode = false;
       this.resetForm();
-
-      // AUTO-REMPLISSAGE : Si c'est un élève, on met son nom d'office
       if (!this.auth.isAdmin()) {
         this.newAssignment.auteur = this.auth.getUsername();
       }
