@@ -150,6 +150,25 @@
   box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.4);
 }
 
+.btn-subjects, .btn-students {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: white;
+  color: #1e293b;
+  border: 1.5px solid #e2e8f0;
+  padding: 12px 24px;
+  border-radius: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-subjects:hover, .btn-students:hover {
+  background: #f8fafc;
+  border-color: #cbd5e0;
+}
+
 /* Table */
 .assignments-card {
   background: white;
@@ -702,4 +721,152 @@ textarea {
 
 .btn-secondary:hover {
   background: #f8fafc;
+}
+
+/* --- Student Modal Styles --- */
+.student-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.student-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 16px;
+  border: 1.5px solid #e2e8f0;
+  transition: all 0.2s;
+}
+
+.student-item:hover {
+  transform: translateY(-2px);
+  border-color: #3b82f6;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.student-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.student-name {
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.student-id {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* --- Subject Modal Specifics --- */
+.subjects-list-container h3, .subject-form-container h3 {
+  font-size: 1rem;
+  color: #1e293b;
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.subject-mini-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.subject-mini-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.subject-mini-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.subject-mini-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.subject-mini-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.subject-mini-prof {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.subject-mini-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-mini-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: white;
+  color: #64748b;
+  transition: all 0.2s;
+  border: 1px solid #e2e8f0;
+}
+
+.btn-mini-icon .material-icons {
+  font-size: 16px;
+}
+
+.btn-mini-icon.edit:hover { background: #fef3c7; color: #d97706; }
+.btn-mini-icon.delete:hover { background: #fee2e2; color: #dc2626; }
+
+/* Styles pour la liste des assignments d'un étudiant */
+.student-assignments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.assignment-mini-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.assignment-mini-card .assignment-info {
+  flex: 1;
+}
+
+.assignment-mini-card .assignment-status {
+  display: flex;
+  align-items: center;
 }

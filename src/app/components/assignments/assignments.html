@@ -34,10 +34,22 @@
       </select>
     </div>
 
-    <button class="btn-add" (click)="openModal()">
-      <span class="material-icons">add</span>
-      Nouveau
-    </button>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn-subjects" (click)="openSubjectModal()">
+        <span class="material-icons">library_books</span>
+        Matières
+      </button>
+
+      <button class="btn-students" (click)="openStudentModal()">
+        <span class="material-icons">people</span>
+        Étudiants
+      </button>
+
+      <button class="btn-add" (click)="openModal()">
+        <span class="material-icons">add</span>
+        Nouveau
+      </button>
+    </div>
   </div>
 </div>
 
@@ -119,7 +131,7 @@
   </div>
 </div>
 
-<!-- Modal Détails -->
+<!-- Modal Détails Devoir -->
 <div class="modal-overlay" *ngIf="showDetailModal">
   <div class="modal-card">
     <div class="modal-header">
@@ -183,6 +195,139 @@
   </div>
 </div>
 
+<!-- Modal Matières -->
+<div class="modal-overlay" *ngIf="showSubjectModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2>Gestion des Matières</h2>
+      <button class="btn-close" (click)="closeSubjectModal()"><span class="material-icons">close</span></button>
+    </div>
+    <div class="modal-body">
+      <!-- Liste des matières existantes -->
+      <div class="subjects-list-container">
+        <h3>Matières existantes</h3>
+        <div class="subject-mini-list">
+          <div *ngFor="let s of availableSubjects" class="subject-mini-item">
+            <div class="subject-mini-icon" [style.background-color]="s.color + '15'" [style.color]="s.color">
+              <span class="material-icons">{{ s.icon }}</span>
+            </div>
+            <div class="subject-mini-info">
+              <span class="subject-mini-name">{{ s.nom }}</span>
+              <span class="subject-mini-prof">Prof: {{ s.prof }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ng-container *ngIf="auth.isAdmin()">
+        <hr style="margin: 24px 0; border: 0; border-top: 1px solid #e2e8f0;">
+
+        <!-- Formulaire de création -->
+        <div class="subject-form-container">
+          <h3>Ajouter une nouvelle matière</h3>
+          <div class="modal-form-grid">
+            <div class="modal-form-group full-width">
+              <label class="modal-label">Nom de la matière</label>
+              <div class="modal-input-wrapper">
+                <span class="material-icons">book</span>
+                <input [(ngModel)]="newSubject.nom" placeholder="ex: Nom de la matière">
+              </div>
+            </div>
+            <div class="modal-form-group">
+              <label class="modal-label">Professeur</label>
+              <div class="modal-input-wrapper">
+                <span class="material-icons">person</span>
+                <input [(ngModel)]="newSubject.prof" placeholder="Nom du prof">
+              </div>
+            </div>
+            <div class="modal-form-group">
+              <label class="modal-label">URL de l'image</label>
+              <div class="modal-input-wrapper">
+                <span class="material-icons">image</span>
+                <input [(ngModel)]="newSubject.image" placeholder="https://...">
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="closeSubjectModal()">Fermer</button>
+      <button class="btn-primary" (click)="saveSubject()" *ngIf="auth.isAdmin()">Enregistrer la matière</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Étudiants -->
+<div class="modal-overlay" *ngIf="showStudentModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2>Liste des Étudiants ({{availableStudents.length}})</h2>
+      <button class="btn-close" (click)="closeStudentModal()"><span class="material-icons">close</span></button>
+    </div>
+    <div class="modal-body">
+      <div class="student-list">
+        <div *ngFor="let s of availableStudents" class="student-item" (click)="onStudentClick(s)" style="cursor: pointer;">
+          <div class="avatar">{{ getInitials(s.name) }}</div>
+          <div class="student-info">
+            <span class="student-name">{{ s.name }}</span>
+            <span class="student-id" *ngIf="s.source">Source: {{ s.source }}</span>
+          </div>
+          <span class="material-icons" style="margin-left: auto; color: #cbd5e0;">chevron_right</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" (click)="closeStudentModal()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Détails Étudiant (Devoirs) -->
+<div class="modal-overlay" *ngIf="showStudentDetailsModal">
+  <div class="modal-card" style="max-width: 800px;">
+    <div class="modal-header">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <button class="btn-icon" (click)="closeStudentDetailsModal()" title="Retour">
+          <span class="material-icons">arrow_back</span>
+        </button>
+        <h2>Devoirs de {{ selectedStudent?.name }} ({{selectedStudentAssignments.length}})</h2>
+      </div>
+      <button class="btn-close" (click)="closeStudentDetailsModal()"><span class="material-icons">close</span></button>
+    </div>
+    <div class="modal-body">
+      <div *ngIf="selectedStudentAssignments.length === 0" style="text-align: center; padding: 40px; color: #94a3b8;">
+        <span class="material-icons" style="font-size: 48px; margin-bottom: 12px;">history_edu</span>
+        <p>Aucun assignment trouvé pour cet étudiant.</p>
+      </div>
+
+      <div class="student-assignments-list" *ngIf="selectedStudentAssignments.length > 0">
+        <div *ngFor="let a of selectedStudentAssignments" class="assignment-mini-card">
+          <div class="subject-mini-icon" [style.color]="getSubjectColor(a.matiere)">
+            <span class="material-icons">{{ getSubjectIcon(a.matiere) }}</span>
+          </div>
+          <div class="assignment-info">
+            <div style="font-weight: 700; color: #1e293b;">{{ a.nom }}</div>
+            <div style="font-size: 0.75rem; color: #64748b;">Matière: {{ a.matiere }} | Rendu le {{ a.dateDeRendu | date:'dd/MM/yyyy' }}</div>
+          </div>
+          <div class="assignment-status">
+            <div class="status-chip" [ngClass]="a.rendu ? 'chip-done' : 'chip-pending'">
+              <span class="dot"></span>
+              {{ a.rendu ? 'Terminé' : 'À faire' }}
+            </div>
+            <div *ngIf="a.rendu" class="note-badge" [ngClass]="getNoteClass(a.note)" style="margin-left: 8px;">
+              {{ a.note }}/20
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" (click)="closeStudentDetailsModal()">Fermer</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Nouveau/Modifier avec Stepper -->
 <div class="modal-overlay" *ngIf="showModal">
   <div class="modal-card">
@@ -242,13 +387,13 @@
               <div class="subject-grid-selection">
                 <div *ngFor="let s of availableSubjects"
                      class="subject-select-card"
-                     [class.selected]="newAssignment.matiere === s.name"
-                     (click)="newAssignment.matiere = s.name; onSubjectChange()">
+                     [class.selected]="newAssignment.matiere === s.nom"
+                     (click)="newAssignment.matiere = s.nom; onSubjectChange()">
                   <div class="subject-card-icon" [style.background-color]="s.color + '15'" [style.color]="s.color">
                     <span class="material-icons">{{ s.icon }}</span>
                   </div>
-                  <span class="subject-card-name">{{ s.name }}</span>
-                  <div class="selected-check" *ngIf="newAssignment.matiere === s.name">
+                  <span class="subject-card-name">{{ s.nom }}</span>
+                  <div class="selected-check" *ngIf="newAssignment.matiere === s.nom">
                     <span class="material-icons">check_circle</span>
                   </div>
                 </div>

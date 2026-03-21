@@ -20,13 +20,20 @@ export class AssignmentsComponent implements OnInit {
   showModal = false;
   showDetailModal = false;
   showSubjectModal = false;
+  showStudentModal = false;
+  showStudentDetailsModal = false;
   isEditMode = false;
+  isSubjectEditMode = false;
   currentEditId = '';
+  currentSubjectEditId = '';
   currentStep = 1;
 
   stats = { total: 0, done: 0, pending: 0 };
-  availableSubjects: SubjectItem[] = [];
+  availableSubjects: any[] = [];
   availableStudents: any[] = [];
+
+  selectedStudent: any = null;
+  selectedStudentAssignments: any[] = [];
 
   page = 1;
   limit = 20;
@@ -59,34 +66,99 @@ export class AssignmentsComponent implements OnInit {
   ngOnInit() {
     this.refreshAssignments();
     this.loadSubjects();
-    this.availableStudents = this.directoryService.getStudents();
+    this.loadStudents();
   }
 
   loadSubjects() {
     this.http.get<any[]>('http://localhost:3000/api/subjects').subscribe({
       next: (data) => {
+        const defaultSubjects = this.directoryService.getSubjects().map(s => ({
+          _id: s.name,
+          nom: s.name,
+          prof: s.prof,
+          image: s.image,
+          icon: s.icon,
+          color: s.color,
+          isStatic: true
+        }));
+
         if (data && data.length > 0) {
-          const backendSubjects = data.map(s => ({
-            name: s.nom,
-            prof: s.prof,
-            image: s.image,
-            icon: 'book',
-            color: '#3b82f6'
-          }));
-          this.availableSubjects = [...this.directoryService.getSubjects(), ...backendSubjects];
+          const backendSubjects = data.map(s => {
+            const cleanImage = (s.image && s.image.includes('via.placeholder.com')) ? '' : s.image;
+            return {
+              ...s,
+              image: cleanImage,
+              icon: 'book',
+              color: '#3b82f6',
+              isStatic: false
+            };
+          });
+          this.availableSubjects = [...defaultSubjects, ...backendSubjects];
         } else {
-          this.availableSubjects = this.directoryService.getSubjects();
+          this.availableSubjects = defaultSubjects;
         }
         this.cd.detectChanges();
       },
       error: () => {
-        this.availableSubjects = this.directoryService.getSubjects();
+        this.availableSubjects = this.directoryService.getSubjects().map(s => ({
+          _id: s.name,
+          nom: s.name,
+          prof: s.prof,
+          image: s.image,
+          icon: s.icon,
+          color: s.color,
+          isStatic: true
+        }));
       }
     });
   }
 
+  loadStudents() {
+    this.http.get<any[]>('http://localhost:3000/api/auth/users').subscribe({
+      next: (users) => {
+        const userList = users.map(u => ({ name: u.username, source: 'Compte', role: u.role }));
+
+        this.http.get<string[]>('http://localhost:3000/api/assignments/authors').subscribe({
+          next: (authors) => {
+            const authorList = authors.map(a => ({ name: a, source: 'Auteur', role: 'user' }));
+            const combined = [...userList, ...authorList];
+            const uniqueMap = new Map();
+            combined.forEach(item => {
+              if(!uniqueMap.has(item.name)) {
+                uniqueMap.set(item.name, item);
+              }
+            });
+            this.availableStudents = Array.from(uniqueMap.values());
+            this.cd.detectChanges();
+          }
+        });
+      }
+    });
+  }
+
+  onStudentClick(student: any) {
+    this.selectedStudent = student;
+    this.selectedStudentAssignments = [];
+    this.showStudentDetailsModal = true;
+
+    // Récupérer les devoirs de cet étudiant
+    this.assignmentService.getAssignments(1, 100, '', '', student.name).subscribe((data: any) => {
+      if (data && data.docs) {
+        this.selectedStudentAssignments = data.docs;
+      }
+      this.cd.detectChanges();
+    });
+  }
+
+  closeStudentDetailsModal() {
+    this.showStudentDetailsModal = false;
+    this.selectedStudent = null;
+    this.selectedStudentAssignments = [];
+    this.cd.detectChanges();
+  }
+
   onSubjectChange() {
-    const subject = this.availableSubjects.find(s => s.name === this.newAssignment.matiere);
+    const subject = this.availableSubjects.find(s => s.nom === this.newAssignment.matiere);
     if (subject) {
       this.newAssignment.prof = subject.prof;
       this.newAssignment.imageMatiere = subject.image || '';
@@ -97,7 +169,10 @@ export class AssignmentsComponent implements OnInit {
     const authorFilter = this.auth.isAdmin() ? '' : this.auth.getUsername();
     this.assignmentService.getAssignments(this.page, this.limit, this.searchQuery, this.filterStatus, authorFilter).subscribe((data: any) => {
       if (data && data.docs) {
-        this.assignments = data.docs;
+        this.assignments = data.docs.map((a: any) => ({
+          ...a,
+          imageMatiere: (a.imageMatiere && a.imageMatiere.includes('via.placeholder.com')) ? '' : a.imageMatiere
+        }));
         this.totalDocs = data.totalDocs;
         this.totalPages = data.totalPages;
         if (data.stats) this.stats = data.stats;
@@ -127,13 +202,43 @@ export class AssignmentsComponent implements OnInit {
 
   openSubjectModal() {
     this.newSubject = { nom: '', prof: '', image: '' };
+    this.isSubjectEditMode = false;
     this.showSubjectModal = true;
     this.cd.detectChanges();
   }
 
   closeSubjectModal() {
     this.showSubjectModal = false;
+    this.isSubjectEditMode = false;
+    this.currentSubjectEditId = '';
     this.cd.detectChanges();
+  }
+
+  openStudentModal() {
+    this.loadStudents();
+    this.showStudentModal = true;
+    this.cd.detectChanges();
+  }
+
+  closeStudentModal() {
+    this.showStudentModal = false;
+    this.cd.detectChanges();
+  }
+
+  deleteSubject(id: string, isStatic: boolean) {
+    if (isStatic) {
+      this.notifService.show('Cette matière par défaut ne peut pas être supprimée', 'info');
+      return;
+    }
+    if (confirm('Supprimer cette matière ?')) {
+      this.http.delete(`http://localhost:3000/api/subjects/${id}`).subscribe({
+        next: () => {
+          this.notifService.show('Matière supprimée', 'success');
+          this.loadSubjects();
+        },
+        error: () => this.notifService.show('Erreur lors de la suppression', 'error')
+      });
+    }
   }
 
   saveSubject() {
@@ -142,7 +247,13 @@ export class AssignmentsComponent implements OnInit {
       return;
     }
 
-    this.http.post('http://localhost:3000/api/subjects', this.newSubject).subscribe({
+    const dataToSend = {
+      nom: this.newSubject.nom,
+      prof: this.newSubject.prof,
+      image: this.newSubject.image
+    };
+
+    this.http.post('http://localhost:3000/api/subjects', dataToSend).subscribe({
       next: () => {
         this.notifService.show('Matière enregistrée avec succès', 'success');
         this.closeSubjectModal();
@@ -226,12 +337,12 @@ export class AssignmentsComponent implements OnInit {
   }
 
   getSubjectIcon(subject: string): string {
-    const s = this.availableSubjects.find(sub => sub.name === subject);
+    const s = this.availableSubjects.find(sub => sub.nom === subject);
     return s ? s.icon : 'menu_book';
   }
 
   getSubjectColor(subject: string): string {
-    const s = this.availableSubjects.find(sub => sub.name === subject);
+    const s = this.availableSubjects.find(sub => sub.nom === subject);
     return s ? s.color : '#718096';
   }
 }
