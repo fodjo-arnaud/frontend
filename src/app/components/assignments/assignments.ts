@@ -44,7 +44,7 @@ export class AssignmentsComponent implements OnInit {
   filterStatus = '';
   selectedAssignment: any = null;
 
-  private readonly API_BASE_URL = 'https://assignments-api1.onrender.com/api';
+  private readonly API_BASE_URL = 'https://assignments-api-5dov.onrender.com/api';
 
   newAssignment: any = {
     nom: '', auteur: '', matiere: '', prof: '', note: null,
