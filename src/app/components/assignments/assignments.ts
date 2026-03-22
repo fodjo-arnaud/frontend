@@ -8,52 +8,53 @@ import { DirectoryService, SubjectItem } from '../../services/directory';
 import { HttpClient } from '@angular/common/http';
 
 @Component({
-  selector: 'app-assignments',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './assignments.html',
-  styleUrls: ['./assignments.css']
+selector: 'app-assignments',
+standalone: true,
+imports: [CommonModule, FormsModule],
+templateUrl: './assignments.html',
+styleUrls: ['./assignments.css']
 })
 export class AssignmentsComponent implements OnInit {
 
-  assignments: any[] = [];
-  showModal = false;
-  showDetailModal = false;
-  showSubjectModal = false;
-  showStudentModal = false;
-  showStudentDetailsModal = false;
-  isEditMode = false;
-  isSubjectEditMode = false;
-  currentEditId = '';
-  currentSubjectEditId = '';
-  currentStep = 1;
+assignments: any[] = [];
+showModal = false;
+showDetailModal = false;
+showSubjectModal = false;
+showStudentModal = false;
+showStudentDetailsModal = false;
+isEditMode = false;
+isSubjectEditMode = false;
+currentEditId = '';
+currentSubjectEditId = '';
+currentStep = 1;
 
-  stats = { total: 0, done: 0, pending: 0 };
-  availableSubjects: any[] = [];
-  availableStudents: any[] = [];
+stats = { total: 0, done: 0, pending: 0 };
+availableSubjects: any[] = [];
+availableStudents: any[] = [];
 
-  selectedStudent: any = null;
-  selectedStudentAssignments: any[] = [];
-  loadingStudentAssignments = false;
+selectedStudent: any = null;
+selectedStudentAssignments: any[] = [];
+loadingStudentAssignments = false;
 
-  page = 1;
-  limit = 20;
-  totalDocs = 0;
-  totalPages = 1;
-  searchQuery = '';
-  filterStatus = '';
-  selectedAssignment: any = null;
+page = 1;
+limit = 20;
+totalDocs = 0;
+totalPages = 1;
+searchQuery = '';
+filterStatus = '';
+selectedAssignment: any = null;
 
-  private readonly API_BASE_URL = 'https://assignments-api-5dov.onrender.com/api';
+// ✅ URL CORRECTE - Nouvelle API sur Render
+private readonly API_BASE_URL = 'https://assignments-api-5dov.onrender.com/api';
 
-  newAssignment: any = {
-    nom: '', auteur: '', matiere: '', prof: '', note: null,
-    dateDeRendu: '', imageMatiere: '', rendu: false, remarques: '', priorite: 'moyenne'
-  };
+newAssignment: any = {
+nom: '', auteur: '', matiere: '', prof: '', note: null,
+dateDeRendu: '', imageMatiere: '', rendu: false, remarques: '', priorite: 'moyenne'
+};
 
-  newSubject: any = { nom: '', prof: '', image: '' };
+newSubject: any = { nom: '', prof: '', image: '' };
 
-  constructor(
+constructor(
     private assignmentService: AssignmentService,
     public auth: AuthService,
     private cd: ChangeDetectorRef,
@@ -82,15 +83,13 @@ export class AssignmentsComponent implements OnInit {
       this.cd.detectChanges();
     };
 
-    // On priorise Render en production
+    // ✅ Utilisation UNIQUEMENT de l'API Render
     this.http.get<any[]>(`${this.API_BASE_URL}/subjects`).subscribe({
       next: (data) => processSubjects(data),
-      error: () => {
-        // Fallback local seulement si Render échoue
-        this.http.get<any[]>(`http://localhost:3000/api/subjects`).subscribe({
-          next: (data) => processSubjects(data),
-          error: () => this.cd.detectChanges()
-        });
+      error: (err) => {
+        console.error('Erreur chargement matières:', err);
+        this.notifService.show('Impossible de charger les matières', 'error');
+        this.cd.detectChanges();
       }
     });
   }
@@ -113,35 +112,32 @@ export class AssignmentsComponent implements OnInit {
       }
     };
 
-    // 1. Récupération via l'endpoint dédié aux auteurs
+    // 1. ✅ Récupération via l'endpoint dédié aux auteurs - UNIQUEMENT Render
     this.http.get<string[]>(`${this.API_BASE_URL}/assignments/authors`).subscribe({
       next: (authors) => processAuthors(authors),
-      error: () => {
-        this.http.get<string[]>(`http://localhost:3000/api/assignments/authors`).subscribe({
-          next: (authors) => processAuthors(authors),
-          error: () => {
-            this.assignmentService.getAssignments(1, 5000).subscribe({
-              next: (data) => {
-                if (data && data.docs) {
-                  const authorsList = [...new Set(data.docs.map((a: any) => a.auteur))]
-                    .filter((name: any): name is string => !!name && typeof name === 'string' && name.trim() !== "")
-                    .map(name => ({ name: name.trim(), source: 'Base de données', role: 'user' }));
-                  this.mergeStudents(authorsList);
-                }
-              }
-            });
-          }
+      error: (err) => {
+        console.error('Erreur chargement auteurs:', err);
+        // Fallback: récupérer depuis les assignments existants
+        this.assignmentService.getAssignments(1, 5000).subscribe({
+          next: (data) => {
+            if (data && data.docs) {
+              const authorsList = [...new Set(data.docs.map((a: any) => a.auteur))]
+                .filter((name: any): name is string => !!name && typeof name === 'string' && name.trim() !== "")
+                .map(name => ({ name: name.trim(), source: 'Base de données', role: 'user' }));
+              this.mergeStudents(authorsList);
+            }
+          },
+          error: () => this.cd.detectChanges()
         });
       }
     });
 
-    // 2. Récupération des comptes utilisateurs
+    // 2. ✅ Récupération des comptes utilisateurs - UNIQUEMENT Render
     this.http.get<any[]>(`${this.API_BASE_URL}/auth/users`).subscribe({
       next: (users) => processUsers(users),
-      error: () => {
-        this.http.get<any[]>(`http://localhost:3000/api/auth/users`).subscribe({
-          next: (users) => processUsers(users)
-        });
+      error: (err) => {
+        console.error('Erreur chargement utilisateurs:', err);
+        this.cd.detectChanges();
       }
     });
   }
@@ -297,19 +293,15 @@ export class AssignmentsComponent implements OnInit {
       return;
     }
     if (confirm('Supprimer cette matière ?')) {
+      // ✅ Utilisation UNIQUEMENT de l'API Render
       this.http.delete(`${this.API_BASE_URL}/subjects/${id}`).subscribe({
         next: () => {
           this.notifService.show('Matière supprimée', 'success');
           this.loadSubjects();
         },
-        error: () => {
-          this.http.delete(`http://localhost:3000/api/subjects/${id}`).subscribe({
-            next: () => {
-              this.notifService.show('Matière supprimée localement', 'success');
-              this.loadSubjects();
-            },
-            error: () => this.notifService.show('Erreur de suppression', 'error')
-          });
+        error: (err) => {
+          console.error('Erreur suppression matière:', err);
+          this.notifService.show('Erreur de suppression', 'error');
         }
       });
     }
@@ -331,20 +323,9 @@ export class AssignmentsComponent implements OnInit {
         this.closeSubjectModal();
         this.loadSubjects();
       },
-      error: () => {
-        // Fallback local
-        const localAction = this.isSubjectEditMode
-          ? this.http.put(`http://localhost:3000/api/subjects/${this.currentSubjectEditId}`, this.newSubject)
-          : this.http.post(`http://localhost:3000/api/subjects`, this.newSubject);
-
-        localAction.subscribe({
-          next: () => {
-            this.notifService.show('Enregistré localement', 'success');
-            this.closeSubjectModal();
-            this.loadSubjects();
-          },
-          error: () => this.notifService.show('Erreur de connexion au serveur', 'error')
-        });
+      error: (err) => {
+        console.error('Erreur sauvegarde matière:', err);
+        this.notifService.show('Erreur de connexion au serveur', 'error');
       }
     });
   }
