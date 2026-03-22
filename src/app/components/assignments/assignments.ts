@@ -82,10 +82,12 @@ export class AssignmentsComponent implements OnInit {
       this.cd.detectChanges();
     };
 
-    this.http.get<any[]>(`http://localhost:3000/api/subjects`).subscribe({
+    // On priorise Render en production
+    this.http.get<any[]>(`${this.API_BASE_URL}/subjects`).subscribe({
       next: (data) => processSubjects(data),
       error: () => {
-        this.http.get<any[]>(`${this.API_BASE_URL}/subjects`).subscribe({
+        // Fallback local seulement si Render échoue
+        this.http.get<any[]>(`http://localhost:3000/api/subjects`).subscribe({
           next: (data) => processSubjects(data),
           error: () => this.cd.detectChanges()
         });
@@ -111,14 +113,13 @@ export class AssignmentsComponent implements OnInit {
       }
     };
 
-    // 1. Récupération via l'endpoint dédié aux auteurs (plus précis)
-    this.http.get<string[]>(`http://localhost:3000/api/assignments/authors`).subscribe({
+    // 1. Récupération via l'endpoint dédié aux auteurs
+    this.http.get<string[]>(`${this.API_BASE_URL}/assignments/authors`).subscribe({
       next: (authors) => processAuthors(authors),
       error: () => {
-        this.http.get<string[]>(`${this.API_BASE_URL}/assignments/authors`).subscribe({
+        this.http.get<string[]>(`http://localhost:3000/api/assignments/authors`).subscribe({
           next: (authors) => processAuthors(authors),
           error: () => {
-            // Fallback : Scan massif si l'endpoint n'est pas dispo
             this.assignmentService.getAssignments(1, 5000).subscribe({
               next: (data) => {
                 if (data && data.docs) {
@@ -135,10 +136,10 @@ export class AssignmentsComponent implements OnInit {
     });
 
     // 2. Récupération des comptes utilisateurs
-    this.http.get<any[]>(`http://localhost:3000/api/auth/users`).subscribe({
+    this.http.get<any[]>(`${this.API_BASE_URL}/auth/users`).subscribe({
       next: (users) => processUsers(users),
       error: () => {
-        this.http.get<any[]>(`${this.API_BASE_URL}/auth/users`).subscribe({
+        this.http.get<any[]>(`http://localhost:3000/api/auth/users`).subscribe({
           next: (users) => processUsers(users)
         });
       }
@@ -149,7 +150,6 @@ export class AssignmentsComponent implements OnInit {
     if (!newList || newList.length === 0) return;
     const map = new Map();
 
-    // On préserve les étudiants déjà trouvés (sensible à la casse pour ne rater aucun élève)
     this.availableStudents.forEach(s => {
       if (s && s.name) map.set(s.name.trim(), s);
     });
@@ -189,11 +189,9 @@ export class AssignmentsComponent implements OnInit {
     this.selectedStudentAssignments = [];
     const searchName = student.name.trim();
 
-    // On utilise '' pour searchQuery et filterStatus, mais on passe searchName comme auteur
     this.assignmentService.getAssignments(1, 1000, '', '', searchName).subscribe({
       next: (data: any) => {
         if (data && data.docs) {
-          // Filtrage strict client au cas où l'API ferait une recherche partielle
           this.selectedStudentAssignments = data.docs.filter((a: any) =>
             a.auteur && a.auteur.trim() === searchName
           );
@@ -299,79 +297,56 @@ export class AssignmentsComponent implements OnInit {
       return;
     }
     if (confirm('Supprimer cette matière ?')) {
-      const deleteFromLocal = () => {
-        this.http.delete(`http://localhost:3000/api/subjects/${id}`).subscribe({
-          next: () => {
-            setTimeout(() => {
-              this.notifService.show('Matière supprimée localement', 'success');
-              this.loadSubjects();
-            });
-          },
-          error: () => setTimeout(() => this.notifService.show('Erreur de suppression', 'error'))
-        });
-      };
-
       this.http.delete(`${this.API_BASE_URL}/subjects/${id}`).subscribe({
         next: () => {
-          setTimeout(() => {
-            this.notifService.show('Matière supprimée sur Render', 'success');
-            this.loadSubjects();
-          });
+          this.notifService.show('Matière supprimée', 'success');
+          this.loadSubjects();
         },
-        error: () => deleteFromLocal()
+        error: () => {
+          this.http.delete(`http://localhost:3000/api/subjects/${id}`).subscribe({
+            next: () => {
+              this.notifService.show('Matière supprimée localement', 'success');
+              this.loadSubjects();
+            },
+            error: () => this.notifService.show('Erreur de suppression', 'error')
+          });
+        }
       });
     }
   }
 
   saveSubject() {
     if (!this.newSubject.nom || !this.newSubject.prof || !this.newSubject.image) {
-      setTimeout(() => this.notifService.show('Champs requis manquants', 'error'));
+      this.notifService.show('Champs requis manquants', 'error');
       return;
     }
 
-    if (this.isSubjectEditMode) {
-      // Update existing subject
-      this.http.put(`${this.API_BASE_URL}/subjects/${this.currentSubjectEditId}`, this.newSubject).subscribe({
-        next: () => {
-          this.notifService.show('Matière mise à jour', 'success');
-          this.closeSubjectModal();
-          this.loadSubjects();
-        },
-        error: () => {
-          this.http.put(`http://localhost:3000/api/subjects/${this.currentSubjectEditId}`, this.newSubject).subscribe({
-            next: () => {
-              this.notifService.show('Matière mise à jour localement', 'success');
-              this.closeSubjectModal();
-              this.loadSubjects();
-            },
-            error: () => this.notifService.show('Erreur lors de la mise à jour', 'error')
-          });
-        }
-      });
-    } else {
-      // Create new subject
-      this.http.post(`${this.API_BASE_URL}/subjects`, this.newSubject).subscribe({
-        next: () => {
-          setTimeout(() => {
-            this.notifService.show('Matière enregistrée sur Render', 'success');
+    const action = this.isSubjectEditMode
+      ? this.http.put(`${this.API_BASE_URL}/subjects/${this.currentSubjectEditId}`, this.newSubject)
+      : this.http.post(`${this.API_BASE_URL}/subjects`, this.newSubject);
+
+    action.subscribe({
+      next: () => {
+        this.notifService.show(this.isSubjectEditMode ? 'Matière mise à jour' : 'Matière enregistrée', 'success');
+        this.closeSubjectModal();
+        this.loadSubjects();
+      },
+      error: () => {
+        // Fallback local
+        const localAction = this.isSubjectEditMode
+          ? this.http.put(`http://localhost:3000/api/subjects/${this.currentSubjectEditId}`, this.newSubject)
+          : this.http.post(`http://localhost:3000/api/subjects`, this.newSubject);
+
+        localAction.subscribe({
+          next: () => {
+            this.notifService.show('Enregistré localement', 'success');
             this.closeSubjectModal();
             this.loadSubjects();
-          });
-        },
-        error: () => {
-          this.http.post(`http://localhost:3000/api/subjects`, this.newSubject).subscribe({
-            next: () => {
-              setTimeout(() => {
-                this.notifService.show('Matière enregistrée localement', 'success');
-                this.closeSubjectModal();
-                this.loadSubjects();
-              });
-            },
-            error: () => setTimeout(() => this.notifService.show('Serveur injoignable', 'error'))
-          });
-        }
-      });
-    }
+          },
+          error: () => this.notifService.show('Erreur de connexion au serveur', 'error')
+        });
+      }
+    });
   }
 
   openModal(assignment?: any) {
