@@ -34,6 +34,7 @@ export class AssignmentsComponent implements OnInit {
 
   selectedStudent: any = null;
   selectedStudentAssignments: any[] = [];
+  loadingStudentAssignments = false;
 
   page = 1;
   limit = 20;
@@ -43,16 +44,14 @@ export class AssignmentsComponent implements OnInit {
   filterStatus = '';
   selectedAssignment: any = null;
 
+  private readonly API_BASE_URL = 'https://assignments-api1.onrender.com/api';
+
   newAssignment: any = {
     nom: '', auteur: '', matiere: '', prof: '', note: null,
     dateDeRendu: '', imageMatiere: '', rendu: false, remarques: '', priorite: 'moyenne'
   };
 
-  newSubject: any = {
-    nom: '',
-    prof: '',
-    image: ''
-  };
+  newSubject: any = { nom: '', prof: '', image: '' };
 
   constructor(
     private assignmentService: AssignmentService,
@@ -70,83 +69,142 @@ export class AssignmentsComponent implements OnInit {
   }
 
   loadSubjects() {
-    this.http.get<any[]>('http://localhost:3000/api/subjects').subscribe({
-      next: (data) => {
-        const defaultSubjects = this.directoryService.getSubjects().map(s => ({
-          _id: s.name,
-          nom: s.name,
-          prof: s.prof,
-          image: s.image,
-          icon: s.icon,
-          color: s.color,
-          isStatic: true
-        }));
+    const defaultSubjects = this.directoryService.getSubjects().map(s => ({
+      _id: s.name, nom: s.name, prof: s.prof, image: s.image, icon: s.icon, color: s.color, isStatic: true
+    }));
+    this.availableSubjects = defaultSubjects;
 
-        if (data && data.length > 0) {
-          const backendSubjects = data.map(s => {
-            const cleanImage = (s.image && s.image.includes('via.placeholder.com')) ? '' : s.image;
-            return {
-              ...s,
-              image: cleanImage,
-              icon: 'book',
-              color: '#3b82f6',
-              isStatic: false
-            };
-          });
-          this.availableSubjects = [...defaultSubjects, ...backendSubjects];
-        } else {
-          this.availableSubjects = defaultSubjects;
-        }
-        this.cd.detectChanges();
-      },
-      error: () => {
-        this.availableSubjects = this.directoryService.getSubjects().map(s => ({
-          _id: s.name,
-          nom: s.name,
-          prof: s.prof,
-          image: s.image,
-          icon: s.icon,
-          color: s.color,
-          isStatic: true
-        }));
+    const processSubjects = (data: any[]) => {
+      if (data && data.length > 0) {
+        const backendSubjects = data.map(s => ({ ...s, icon: 'book', color: '#3b82f6', isStatic: false }));
+        this.availableSubjects = [...defaultSubjects, ...backendSubjects];
       }
-    });
-  }
+      this.cd.detectChanges();
+    };
 
-  loadStudents() {
-    this.http.get<any[]>('http://localhost:3000/api/auth/users').subscribe({
-      next: (users) => {
-        const userList = users.map(u => ({ name: u.username, source: 'Compte', role: u.role }));
-
-        this.http.get<string[]>('http://localhost:3000/api/assignments/authors').subscribe({
-          next: (authors) => {
-            const authorList = authors.map(a => ({ name: a, source: 'Auteur', role: 'user' }));
-            const combined = [...userList, ...authorList];
-            const uniqueMap = new Map();
-            combined.forEach(item => {
-              if(!uniqueMap.has(item.name)) {
-                uniqueMap.set(item.name, item);
-              }
-            });
-            this.availableStudents = Array.from(uniqueMap.values());
-            this.cd.detectChanges();
-          }
+    this.http.get<any[]>(`http://localhost:3000/api/subjects`).subscribe({
+      next: (data) => processSubjects(data),
+      error: () => {
+        this.http.get<any[]>(`${this.API_BASE_URL}/subjects`).subscribe({
+          next: (data) => processSubjects(data),
+          error: () => this.cd.detectChanges()
         });
       }
     });
   }
 
-  onStudentClick(student: any) {
-    this.selectedStudent = student;
-    this.selectedStudentAssignments = [];
-    this.showStudentDetailsModal = true;
+  loadStudents() {
+    this.extractStudentsFromAssignments();
 
-    // Récupérer les devoirs de cet étudiant
-    this.assignmentService.getAssignments(1, 100, '', '', student.name).subscribe((data: any) => {
-      if (data && data.docs) {
-        this.selectedStudentAssignments = data.docs;
+    const processAuthors = (authors: string[]) => {
+      if (authors && authors.length > 0) {
+        const studentList = authors
+          .filter((name: any): name is string => !!name && typeof name === 'string' && name.trim() !== "")
+          .map(name => ({ name: name.trim(), source: 'Base de données', role: 'user' }));
+        this.mergeStudents(studentList);
       }
-      this.cd.detectChanges();
+    };
+
+    const processUsers = (users: any[]) => {
+      if (users && users.length > 0) {
+        this.mergeStudents(users.map(u => ({ name: u.username, source: 'Compte', role: u.role })));
+      }
+    };
+
+    // 1. Récupération via l'endpoint dédié aux auteurs (plus précis)
+    this.http.get<string[]>(`http://localhost:3000/api/assignments/authors`).subscribe({
+      next: (authors) => processAuthors(authors),
+      error: () => {
+        this.http.get<string[]>(`${this.API_BASE_URL}/assignments/authors`).subscribe({
+          next: (authors) => processAuthors(authors),
+          error: () => {
+            // Fallback : Scan massif si l'endpoint n'est pas dispo
+            this.assignmentService.getAssignments(1, 5000).subscribe({
+              next: (data) => {
+                if (data && data.docs) {
+                  const authorsList = [...new Set(data.docs.map((a: any) => a.auteur))]
+                    .filter((name: any): name is string => !!name && typeof name === 'string' && name.trim() !== "")
+                    .map(name => ({ name: name.trim(), source: 'Base de données', role: 'user' }));
+                  this.mergeStudents(authorsList);
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // 2. Récupération des comptes utilisateurs
+    this.http.get<any[]>(`http://localhost:3000/api/auth/users`).subscribe({
+      next: (users) => processUsers(users),
+      error: () => {
+        this.http.get<any[]>(`${this.API_BASE_URL}/auth/users`).subscribe({
+          next: (users) => processUsers(users)
+        });
+      }
+    });
+  }
+
+  mergeStudents(newList: any[]) {
+    if (!newList || newList.length === 0) return;
+    const map = new Map();
+
+    // On préserve les étudiants déjà trouvés (sensible à la casse pour ne rater aucun élève)
+    this.availableStudents.forEach(s => {
+      if (s && s.name) map.set(s.name.trim(), s);
+    });
+
+    newList.forEach(item => {
+      const name = (item && item.name) ? item.name.trim() : null;
+      if (name && !map.has(name)) {
+        map.set(name, { ...item, name });
+      }
+    });
+
+    this.availableStudents = Array.from(map.values()).sort((a: any, b: any) =>
+      (a.name || '').localeCompare(b.name || '')
+    );
+    this.cd.detectChanges();
+  }
+
+  extractStudentsFromAssignments() {
+    if (!this.assignments || this.assignments.length === 0) return;
+    const authors = this.assignments
+      .map(a => a.auteur)
+      .filter((name: any): name is string => !!name && typeof name === 'string' && name.trim() !== "");
+
+    if (authors.length > 0) {
+      const studentObjects = [...new Set(authors)].map((name: string) => ({
+        name: name.trim(), source: 'Auteur', role: 'user'
+      }));
+      this.mergeStudents(studentObjects);
+    }
+  }
+
+  onStudentClick(student: any) {
+    if (!student || !student.name) return;
+    this.selectedStudent = student;
+    this.showStudentDetailsModal = true;
+    this.loadingStudentAssignments = true;
+    this.selectedStudentAssignments = [];
+    const searchName = student.name.trim();
+
+    // On utilise '' pour searchQuery et filterStatus, mais on passe searchName comme auteur
+    this.assignmentService.getAssignments(1, 1000, '', '', searchName).subscribe({
+      next: (data: any) => {
+        if (data && data.docs) {
+          // Filtrage strict client au cas où l'API ferait une recherche partielle
+          this.selectedStudentAssignments = data.docs.filter((a: any) =>
+            a.auteur && a.auteur.trim() === searchName
+          );
+        }
+        this.loadingStudentAssignments = false;
+        this.cd.detectChanges();
+      },
+      error: () => {
+        this.loadingStudentAssignments = false;
+        this.cd.detectChanges();
+      }
     });
   }
 
@@ -170,12 +228,12 @@ export class AssignmentsComponent implements OnInit {
     this.assignmentService.getAssignments(this.page, this.limit, this.searchQuery, this.filterStatus, authorFilter).subscribe((data: any) => {
       if (data && data.docs) {
         this.assignments = data.docs.map((a: any) => ({
-          ...a,
-          imageMatiere: (a.imageMatiere && a.imageMatiere.includes('via.placeholder.com')) ? '' : a.imageMatiere
+          ...a, imageMatiere: (a.imageMatiere && a.imageMatiere.includes('via.placeholder.com')) ? '' : a.imageMatiere
         }));
         this.totalDocs = data.totalDocs;
         this.totalPages = data.totalPages;
         if (data.stats) this.stats = data.stats;
+        this.extractStudentsFromAssignments();
       }
       this.cd.detectChanges();
     });
@@ -210,7 +268,17 @@ export class AssignmentsComponent implements OnInit {
   closeSubjectModal() {
     this.showSubjectModal = false;
     this.isSubjectEditMode = false;
-    this.currentSubjectEditId = '';
+    this.cd.detectChanges();
+  }
+
+  editSubject(subject: any) {
+    if (subject.isStatic) {
+      this.notifService.show('Matière par défaut non modifiable', 'info');
+      return;
+    }
+    this.isSubjectEditMode = true;
+    this.currentSubjectEditId = subject._id;
+    this.newSubject = { ...subject };
     this.cd.detectChanges();
   }
 
@@ -227,42 +295,83 @@ export class AssignmentsComponent implements OnInit {
 
   deleteSubject(id: string, isStatic: boolean) {
     if (isStatic) {
-      this.notifService.show('Cette matière par défaut ne peut pas être supprimée', 'info');
+      setTimeout(() => this.notifService.show('Matière par défaut non supprimable', 'info'));
       return;
     }
     if (confirm('Supprimer cette matière ?')) {
-      this.http.delete(`http://localhost:3000/api/subjects/${id}`).subscribe({
+      const deleteFromLocal = () => {
+        this.http.delete(`http://localhost:3000/api/subjects/${id}`).subscribe({
+          next: () => {
+            setTimeout(() => {
+              this.notifService.show('Matière supprimée localement', 'success');
+              this.loadSubjects();
+            });
+          },
+          error: () => setTimeout(() => this.notifService.show('Erreur de suppression', 'error'))
+        });
+      };
+
+      this.http.delete(`${this.API_BASE_URL}/subjects/${id}`).subscribe({
         next: () => {
-          this.notifService.show('Matière supprimée', 'success');
-          this.loadSubjects();
+          setTimeout(() => {
+            this.notifService.show('Matière supprimée sur Render', 'success');
+            this.loadSubjects();
+          });
         },
-        error: () => this.notifService.show('Erreur lors de la suppression', 'error')
+        error: () => deleteFromLocal()
       });
     }
   }
 
   saveSubject() {
     if (!this.newSubject.nom || !this.newSubject.prof || !this.newSubject.image) {
-      this.notifService.show('Veuillez remplir tous les champs', 'error');
+      setTimeout(() => this.notifService.show('Champs requis manquants', 'error'));
       return;
     }
 
-    const dataToSend = {
-      nom: this.newSubject.nom,
-      prof: this.newSubject.prof,
-      image: this.newSubject.image
-    };
-
-    this.http.post('http://localhost:3000/api/subjects', dataToSend).subscribe({
-      next: () => {
-        this.notifService.show('Matière enregistrée avec succès', 'success');
-        this.closeSubjectModal();
-        this.loadSubjects();
-      },
-      error: () => {
-        this.notifService.show('Erreur lors de l\'enregistrement', 'error');
-      }
-    });
+    if (this.isSubjectEditMode) {
+      // Update existing subject
+      this.http.put(`${this.API_BASE_URL}/subjects/${this.currentSubjectEditId}`, this.newSubject).subscribe({
+        next: () => {
+          this.notifService.show('Matière mise à jour', 'success');
+          this.closeSubjectModal();
+          this.loadSubjects();
+        },
+        error: () => {
+          this.http.put(`http://localhost:3000/api/subjects/${this.currentSubjectEditId}`, this.newSubject).subscribe({
+            next: () => {
+              this.notifService.show('Matière mise à jour localement', 'success');
+              this.closeSubjectModal();
+              this.loadSubjects();
+            },
+            error: () => this.notifService.show('Erreur lors de la mise à jour', 'error')
+          });
+        }
+      });
+    } else {
+      // Create new subject
+      this.http.post(`${this.API_BASE_URL}/subjects`, this.newSubject).subscribe({
+        next: () => {
+          setTimeout(() => {
+            this.notifService.show('Matière enregistrée sur Render', 'success');
+            this.closeSubjectModal();
+            this.loadSubjects();
+          });
+        },
+        error: () => {
+          this.http.post(`http://localhost:3000/api/subjects`, this.newSubject).subscribe({
+            next: () => {
+              setTimeout(() => {
+                this.notifService.show('Matière enregistrée localement', 'success');
+                this.closeSubjectModal();
+                this.loadSubjects();
+              });
+            },
+            error: () => setTimeout(() => this.notifService.show('Serveur injoignable', 'error'))
+          });
+        }
+      });
+    }
   }
 
   openModal(assignment?: any) {
@@ -277,7 +386,7 @@ export class AssignmentsComponent implements OnInit {
     } else {
       this.isEditMode = false;
       this.resetForm();
-      if (!this.auth.isAdmin()) { this.newAssignment.auteur = this.auth.getUsername(); }
+      if (!this.auth.isAdmin()) this.newAssignment.auteur = this.auth.getUsername();
     }
     this.showModal = true;
     this.cd.detectChanges();
@@ -301,26 +410,26 @@ export class AssignmentsComponent implements OnInit {
 
   onSaveAssignment() {
     if (!this.newAssignment.nom || !this.newAssignment.auteur) return;
-    if (this.isEditMode) {
-      this.assignmentService.updateAssignment(this.currentEditId, this.newAssignment).subscribe(() => {
-        this.notifService.show('Assignment mis à jour', 'success');
+    const action = this.isEditMode
+      ? this.assignmentService.updateAssignment(this.currentEditId, this.newAssignment)
+      : this.assignmentService.addAssignment(this.newAssignment);
+
+    action.subscribe(() => {
+      setTimeout(() => {
+        this.notifService.show(this.isEditMode ? 'Mis à jour' : 'Créé', 'success');
         this.closeModal();
         this.refreshAssignments();
       });
-    } else {
-      this.assignmentService.addAssignment(this.newAssignment).subscribe(() => {
-        this.notifService.show('Nouvel assignment créé', 'success');
-        this.closeModal();
-        this.refreshAssignments();
-      });
-    }
+    });
   }
 
   onDeleteAssignment(id: string) {
-    if (confirm('Supprimer cet assignment ?')) {
+    if (confirm('Supprimer ?')) {
       this.assignmentService.deleteAssignment(id).subscribe(() => {
-        this.notifService.show('Supprimé', 'info');
-        this.refreshAssignments();
+        setTimeout(() => {
+          this.notifService.show('Supprimé', 'info');
+          this.refreshAssignments();
+        });
       });
     }
   }

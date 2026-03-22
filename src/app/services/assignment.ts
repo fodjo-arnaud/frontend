@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 @Injectable({
@@ -12,12 +12,15 @@ export class AssignmentService {
   constructor(private http: HttpClient) {}
 
   getAssignments(page: number = 1, limit: number = 20, search: string = '', filter: string = '', author: string = ''): Observable<any> {
-    let queryUrl = `${this.url}?page=${page}&limit=${limit}`;
-    if (search) queryUrl += `&search=${search}`;
-    if (filter) queryUrl += `&rendu=${filter}`;
-    // On ajoute le filtre par auteur si précisé
-    if (author) queryUrl += `&auteur=${author}`;
-    return this.http.get(queryUrl);
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('limit', limit.toString());
+
+    if (search) params = params.set('search', search);
+    if (filter) params = params.set('rendu', filter);
+    if (author) params = params.set('auteur', author);
+
+    return this.http.get(this.url, { params });
   }
 
   addAssignment(assignment: any): Observable<any> {

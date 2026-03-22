@@ -85,7 +85,7 @@
             <div style="font-size: 0.75rem; color: #7f8c8d;">Prof: {{a.prof}}</div>
           </td>
           <td>
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="author-cell" (click)="onStudentClick({name: a.auteur})" title="Voir les devoirs de cet élève">
               <div class="avatar">{{ getInitials(a.auteur) }}</div>
               <span>{{a.auteur}}</span>
             </div>
@@ -215,6 +215,15 @@
               <span class="subject-mini-name">{{ s.nom }}</span>
               <span class="subject-mini-prof">Prof: {{ s.prof }}</span>
             </div>
+            <!-- Ajout des actions pour toutes les matières pour l'admin -->
+            <div class="subject-mini-actions" *ngIf="auth.isAdmin()">
+              <button class="btn-mini-icon edit" (click)="editSubject(s)" title="Modifier cette matière">
+                <span class="material-icons">edit</span>
+              </button>
+              <button class="btn-mini-icon delete" (click)="deleteSubject(s._id, s.isStatic)" title="Supprimer cette matière">
+                <span class="material-icons">delete</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -222,9 +231,9 @@
       <ng-container *ngIf="auth.isAdmin()">
         <hr style="margin: 24px 0; border: 0; border-top: 1px solid #e2e8f0;">
 
-        <!-- Formulaire de création -->
+        <!-- Formulaire de création/modification -->
         <div class="subject-form-container">
-          <h3>Ajouter une nouvelle matière</h3>
+          <h3>{{ isSubjectEditMode ? 'Modifier la matière' : 'Ajouter une nouvelle matière' }}</h3>
           <div class="modal-form-grid">
             <div class="modal-form-group full-width">
               <label class="modal-label">Nom de la matière</label>
@@ -253,7 +262,9 @@
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" (click)="closeSubjectModal()">Fermer</button>
-      <button class="btn-primary" (click)="saveSubject()" *ngIf="auth.isAdmin()">Enregistrer la matière</button>
+      <button class="btn-primary" (click)="saveSubject()" *ngIf="auth.isAdmin()">
+        {{ isSubjectEditMode ? 'Mettre à jour' : 'Enregistrer la matière' }}
+      </button>
     </div>
   </div>
 </div>
@@ -283,7 +294,7 @@
   </div>
 </div>
 
-<!-- Modal Détails Étudiant (Devoirs) -->
+<!-- Modal Détails Étudiant (Liste de ses devoirs) -->
 <div class="modal-overlay" *ngIf="showStudentDetailsModal">
   <div class="modal-card" style="max-width: 800px;">
     <div class="modal-header">
@@ -302,10 +313,7 @@
       </div>
 
       <div class="student-assignments-list" *ngIf="selectedStudentAssignments.length > 0">
-        <div *ngFor="let a of selectedStudentAssignments" class="assignment-mini-card">
-          <div class="subject-mini-icon" [style.color]="getSubjectColor(a.matiere)">
-            <span class="material-icons">{{ getSubjectIcon(a.matiere) }}</span>
-          </div>
+        <div *ngFor="let a of selectedStudentAssignments" class="assignment-mini-card" (click)="onViewDetails(a)" style="cursor: pointer; transition: all 0.2s;">
           <div class="assignment-info">
             <div style="font-weight: 700; color: #1e293b;">{{ a.nom }}</div>
             <div style="font-size: 0.75rem; color: #64748b;">Matière: {{ a.matiere }} | Rendu le {{ a.dateDeRendu | date:'dd/MM/yyyy' }}</div>
@@ -319,6 +327,7 @@
               {{ a.note }}/20
             </div>
           </div>
+          <span class="material-icons" style="margin-left: 10px; color: #cbd5e0;">visibility</span>
         </div>
       </div>
     </div>
