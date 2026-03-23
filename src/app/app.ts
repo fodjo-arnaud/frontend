@@ -1,9 +1,10 @@
-import { Component, OnInit, Renderer2 } from '@angular/core';
+import { Component, OnInit, Renderer2, ChangeDetectorRef } from '@angular/core';
 import { RouterOutlet, Router, RouterLink, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth';
 import { NotificationService, Notification } from './services/notification';
 import { filter } from 'rxjs/operators';
+import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'app-root',
@@ -21,7 +22,9 @@ export class AppComponent implements OnInit {
     public auth: AuthService,
     private router: Router,
     private notifService: NotificationService,
-    private renderer: Renderer2
+    private renderer: Renderer2,
+    private http: HttpClient,
+    private cd: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
@@ -38,7 +41,11 @@ export class AppComponent implements OnInit {
     });
 
     this.notifService.getNotification().subscribe(notif => {
-      this.notification = notif.show ? notif : null;
+      // On utilise setTimeout pour éviter l'erreur ExpressionChangedAfterItHasBeenCheckedError
+      setTimeout(() => {
+        this.notification = notif.show ? notif : null;
+        this.cd.detectChanges();
+      });
     });
   }
 
@@ -71,5 +78,9 @@ export class AppComponent implements OnInit {
     this.auth.logout();
     this.notifService.show('Déconnexion réussie', 'info');
     this.router.navigate(['/']);
+  }
+
+  openCreateUser() {
+    this.notifService.triggerCreateUserModal();
   }
 }

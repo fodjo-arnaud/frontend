@@ -14,6 +14,14 @@
           <span class="stat-name">Total</span>
         </div>
       </div>
+      <!-- Stat Card En Attente -->
+      <div class="stat-card" *ngIf="auth.isAdmin()">
+        <span class="material-icons" style="color: #f59e0b;">pending_actions</span>
+        <div class="stat-info">
+          <span class="stat-count">{{submittedAssignments.length}}</span>
+          <span class="stat-name">En attente</span>
+        </div>
+      </div>
     </div>
 
     <div class="filters-container">
@@ -34,7 +42,12 @@
       </select>
     </div>
 
-    <div style="display: flex; gap: 10px;">
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <button class="btn-pending-list" (click)="togglePendingOverlay()" *ngIf="auth.isAdmin()" [class.active]="showAdminNotify">
+        <span class="material-icons">assignment_turned_in</span>
+        En attente
+      </button>
+
       <button class="btn-subjects" (click)="openSubjectModal()">
         <span class="material-icons">library_books</span>
         Matières
@@ -127,6 +140,30 @@
     <div style="display: flex; gap: 10px;">
       <button class="btn-pagination" (click)="previousPage()" [disabled]="page === 1">Précédent</button>
       <button class="btn-pagination" (click)="nextPage()" [disabled]="page === totalPages">Suivant</button>
+    </div>
+  </div>
+</div>
+
+<!-- Notification Pop-up pour Admin (Style amélioré selon capture) -->
+<div class="admin-notification-overlay" *ngIf="auth.isAdmin() && showAdminNotify">
+  <div class="notification-pop">
+    <div class="pop-header orange-theme">
+      <span class="material-icons">assignment_late</span>
+      <h3>Assignments en attente de validation</h3>
+      <button class="btn-close-mini" (click)="showAdminNotify = false"><span class="material-icons">close</span></button>
+    </div>
+    <div class="pop-body">
+      <div *ngIf="submittedAssignments.length === 0" class="empty-pending">
+        <span class="material-icons check-icon">check_circle</span>
+        <p>Aucun assignment en attente.</p>
+      </div>
+      <div *ngFor="let sa of submittedAssignments" class="pop-item">
+        <div class="pop-info">
+          <div class="pop-author">{{ sa.auteur }}</div>
+          <div class="pop-assignment-name">{{ sa.nom }}</div>
+        </div>
+        <button class="btn-mini-action orange" (click)="openGradeModal(sa)">Noter</button>
+      </div>
     </div>
   </div>
 </div>
@@ -454,7 +491,7 @@
               </div>
             </div>
 
-            <div class="modal-form-group full-width" *ngIf="isEditMode">
+            <div class="modal-form-group full-width">
               <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 12px; border-radius: 12px; background: #f8fafc; border: 1.5px solid #e2e8f0;">
                 <input type="checkbox" [(ngModel)]="newAssignment.rendu" name="rendu" style="width: 20px; height: 20px; margin: 0;">
                 <span style="font-weight: 700; color: #1e293b;">Marquer comme rendu</span>

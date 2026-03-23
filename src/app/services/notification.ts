@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 
 export interface Notification {
   message: string;
@@ -17,8 +17,18 @@ export class NotificationService {
     show: false
   });
 
+  private createUserModalTrigger$ = new Subject<void>();
+
   getNotification() {
     return this.notification$.asObservable();
+  }
+
+  getCreateUserModalTrigger() {
+    return this.createUserModalTrigger$.asObservable();
+  }
+
+  triggerCreateUserModal() {
+    this.createUserModalTrigger$.next();
   }
 
   show(message: string, type: 'success' | 'error' | 'info' = 'success') {

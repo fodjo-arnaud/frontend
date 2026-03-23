@@ -41,6 +41,18 @@
       <p class="section-desc">Mettez à jour votre mot de passe pour sécuriser votre compte.</p>
 
       <form (submit)="onChangePassword(); $event.preventDefault()">
+        <!-- ✅ Champ de nom d'utilisateur (caché pour l'accessibilité) -->
+        <div style="position: absolute; width: 0; height: 0; overflow: hidden;">
+          <label for="username-hidden">Nom d'utilisateur</label>
+          <input
+            type="text"
+            id="username-hidden"
+            name="username"
+            autocomplete="username"
+            value="{{ username }}"
+            readonly>
+        </div>
+
         <div class="form-group">
           <label>Mot de passe actuel</label>
           <div class="input-wrapper">
@@ -49,7 +61,9 @@
               [type]="showPasswords.current ? 'text' : 'password'"
               [(ngModel)]="passwords.current"
               name="current"
+              autocomplete="current-password"
               placeholder="Mot de passe actuel"
+              required
             >
             <button type="button" class="btn-toggle" (click)="togglePassword('current')">
               <span class="material-icons">{{ showPasswords.current ? 'visibility_off' : 'visibility' }}</span>
@@ -65,7 +79,10 @@
               [type]="showPasswords.new ? 'text' : 'password'"
               [(ngModel)]="passwords.new"
               name="new"
+              autocomplete="new-password"
               placeholder="Nouveau mot de passe"
+              required
+              minlength="6"
             >
             <button type="button" class="btn-toggle" (click)="togglePassword('new')">
               <span class="material-icons">{{ showPasswords.new ? 'visibility_off' : 'visibility' }}</span>
@@ -81,7 +98,9 @@
               [type]="showPasswords.confirm ? 'text' : 'password'"
               [(ngModel)]="passwords.confirm"
               name="confirm"
+              autocomplete="new-password"
               placeholder="Confirmer"
+              required
             >
             <button type="button" class="btn-toggle" (click)="togglePassword('confirm')">
               <span class="material-icons">{{ showPasswords.confirm ? 'visibility_off' : 'visibility' }}</span>
@@ -89,7 +108,16 @@
           </div>
         </div>
 
-        <button type="submit" class="btn-update-password" [disabled]="!passwords.new || !passwords.confirm">
+        <!-- Message d'erreur si les mots de passe ne correspondent pas -->
+        <div *ngIf="passwords.new && passwords.confirm && passwords.new !== passwords.confirm" class="error-message">
+          <span class="material-icons">error_outline</span>
+          Les mots de passe ne correspondent pas
+        </div>
+
+        <button
+          type="submit"
+          class="btn-update-password"
+          [disabled]="!passwords.current || !passwords.new || !passwords.confirm || passwords.new !== passwords.confirm">
           <span class="material-icons">save</span>
           Enregistrer le nouveau mot de passe
         </button>

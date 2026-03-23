@@ -17,6 +17,7 @@
             [(ngModel)]="username"
             name="username"
             id="username"
+            autocomplete="username"
             placeholder="admin, user..."
             type="text"
             required
@@ -33,6 +34,7 @@
               [(ngModel)]="password"
               name="password"
               id="password"
+              autocomplete="current-password"
               [type]="showPassword ? 'text' : 'password'"
               placeholder="••••••••"
               required

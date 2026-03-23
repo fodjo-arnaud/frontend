@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AssignmentService } from '../../services/assignment';
@@ -6,6 +6,7 @@ import { AuthService } from '../../services/auth';
 import { NotificationService } from '../../services/notification';
 import { DirectoryService, SubjectItem } from '../../services/directory';
 import { HttpClient } from '@angular/common/http';
+import { interval, Subscription } from 'rxjs';
 
 @Component({
 selector: 'app-assignments',
@@ -14,7 +15,7 @@ imports: [CommonModule, FormsModule],
 templateUrl: './assignments.html',
 styleUrls: ['./assignments.css']
 })
-export class AssignmentsComponent implements OnInit {
+export class AssignmentsComponent implements OnInit, OnDestroy {
 
 assignments: any[] = [];
 showModal = false;
@@ -22,11 +23,18 @@ showDetailModal = false;
 showSubjectModal = false;
 showStudentModal = false;
 showStudentDetailsModal = false;
+showCreateUserModal = false;
 isEditMode = false;
 isSubjectEditMode = false;
 currentEditId = '';
 currentSubjectEditId = '';
 currentStep = 1;
+
+// Notification Admin & Filtre En Attente
+submittedAssignments: any[] = [];
+showAdminNotify = false;
+private pollSubscription?: Subscription;
+private createUserSubscription?: Subscription;
 
 stats = { total: 0, done: 0, pending: 0 };
 availableSubjects: any[] = [];
@@ -35,6 +43,7 @@ availableStudents: any[] = [];
 selectedStudent: any = null;
 selectedStudentAssignments: any[] = [];
 loadingStudentAssignments = false;
+isSavingUser = false;
 
 page = 1;
 limit = 20;
@@ -44,15 +53,17 @@ searchQuery = '';
 filterStatus = '';
 selectedAssignment: any = null;
 
-// ✅ URL CORRECTE - Nouvelle API sur Render
+// ✅ URL CORRECTE - API déployée sur Render
 private readonly API_BASE_URL = 'https://assignments-api-5dov.onrender.com/api';
 
 newAssignment: any = {
 nom: '', auteur: '', matiere: '', prof: '', note: null,
-dateDeRendu: '', imageMatiere: '', rendu: false, remarques: '', priorite: 'moyenne'
+dateDeRendu: '', imageMatiere: '', rendu: false, remarques: '', priorite: 'moyenne',
+noteAttribuee: false
 };
 
 newSubject: any = { nom: '', prof: '', image: '' };
+newUser: any = { username: '', password: '', role: 'user' };
 
 constructor(
     private assignmentService: AssignmentService,
@@ -67,6 +78,60 @@ constructor(
     this.refreshAssignments();
     this.loadSubjects();
     this.loadStudents();
+
+    if (this.auth.isAdmin()) {
+      this.startAdminPolling();
+    }
+
+    // Écouter le trigger depuis la navbar pour créer un utilisateur
+    this.createUserSubscription = this.notifService.getCreateUserModalTrigger().subscribe(() => {
+      this.openCreateUserModal();
+    });
+  }
+
+  ngOnDestroy() {
+    if (this.pollSubscription) {
+      this.pollSubscription.unsubscribe();
+    }
+    if (this.createUserSubscription) {
+      this.createUserSubscription.unsubscribe();
+    }
+  }
+
+  startAdminPolling() {
+    this.pollSubscription = interval(15000).subscribe(() => {
+      this.checkNewSubmissions();
+    });
+    this.checkNewSubmissions();
+  }
+
+  checkNewSubmissions() {
+    if (!this.auth.isAdmin()) return;
+    this.assignmentService.getAssignments(1, 1000, '', 'true').subscribe((data: any) => {
+      if (data && data.docs) {
+        this.submittedAssignments = data.docs.filter((a: any) =>
+          a.rendu === true &&
+          (a.note === null || a.note === undefined) &&
+          a.auteur !== 'admin'
+        );
+      }
+      this.cd.detectChanges();
+    });
+  }
+
+  togglePendingOverlay() {
+    this.showAdminNotify = !this.showAdminNotify;
+    if (this.showAdminNotify) {
+      this.checkNewSubmissions();
+    }
+    this.cd.detectChanges();
+  }
+
+  openGradeModal(assignment: any) {
+    this.showAdminNotify = false;
+    this.openModal(assignment);
+    this.currentStep = 3;
+    this.cd.detectChanges();
   }
 
   loadSubjects() {
@@ -88,7 +153,6 @@ constructor(
       next: (data) => processSubjects(data),
       error: (err) => {
         console.error('Erreur chargement matières:', err);
-        this.notifService.show('Impossible de charger les matières', 'error');
         this.cd.detectChanges();
       }
     });
@@ -112,7 +176,7 @@ constructor(
       }
     };
 
-    // 1. ✅ Récupération via l'endpoint dédié aux auteurs - UNIQUEMENT Render
+    // ✅ Charger les auteurs uniques depuis l'API Render
     this.http.get<string[]>(`${this.API_BASE_URL}/assignments/authors`).subscribe({
       next: (authors) => processAuthors(authors),
       error: (err) => {
@@ -132,7 +196,7 @@ constructor(
       }
     });
 
-    // 2. ✅ Récupération des comptes utilisateurs - UNIQUEMENT Render
+    // ✅ Charger les utilisateurs depuis l'API Render
     this.http.get<any[]>(`${this.API_BASE_URL}/auth/users`).subscribe({
       next: (users) => processUsers(users),
       error: (err) => {
@@ -146,6 +210,7 @@ constructor(
     if (!newList || newList.length === 0) return;
     const map = new Map();
 
+    // On préserve les étudiants déjà trouvés
     this.availableStudents.forEach(s => {
       if (s && s.name) map.set(s.name.trim(), s);
     });
@@ -221,9 +286,7 @@ constructor(
     const authorFilter = this.auth.isAdmin() ? '' : this.auth.getUsername();
     this.assignmentService.getAssignments(this.page, this.limit, this.searchQuery, this.filterStatus, authorFilter).subscribe((data: any) => {
       if (data && data.docs) {
-        this.assignments = data.docs.map((a: any) => ({
-          ...a, imageMatiere: (a.imageMatiere && a.imageMatiere.includes('via.placeholder.com')) ? '' : a.imageMatiere
-        }));
+        this.assignments = data.docs;
         this.totalDocs = data.totalDocs;
         this.totalPages = data.totalPages;
         if (data.stats) this.stats = data.stats;
@@ -261,15 +324,11 @@ constructor(
 
   closeSubjectModal() {
     this.showSubjectModal = false;
-    this.isSubjectEditMode = false;
     this.cd.detectChanges();
   }
 
   editSubject(subject: any) {
-    if (subject.isStatic) {
-      this.notifService.show('Matière par défaut non modifiable', 'info');
-      return;
-    }
+    if (subject.isStatic) return;
     this.isSubjectEditMode = true;
     this.currentSubjectEditId = subject._id;
     this.newSubject = { ...subject };
@@ -287,13 +346,44 @@ constructor(
     this.cd.detectChanges();
   }
 
-  deleteSubject(id: string, isStatic: boolean) {
-    if (isStatic) {
-      setTimeout(() => this.notifService.show('Matière par défaut non supprimable', 'info'));
+  openCreateUserModal() {
+    this.newUser = { username: '', password: '', role: 'user' };
+    this.showCreateUserModal = true;
+    this.cd.detectChanges();
+  }
+
+  closeCreateUserModal() {
+    this.showCreateUserModal = false;
+    this.isSavingUser = false;
+    this.cd.detectChanges();
+  }
+
+  saveUser() {
+    if (!this.newUser.username || !this.newUser.password) {
+      this.notifService.show('Veuillez remplir tous les champs', 'error');
       return;
     }
+
+    this.isSavingUser = true;
+
+    // ✅ Envoi UNIQUEMENT vers l'API Render
+    this.http.post(`${this.API_BASE_URL}/auth/register`, this.newUser).subscribe({
+      next: () => {
+        this.notifService.show(`Compte ${this.newUser.username} créé !`, 'success');
+        this.closeCreateUserModal();
+        this.loadStudents();
+      },
+      error: (err) => {
+        console.error('Erreur création utilisateur:', err);
+        this.notifService.show(err.error?.message || 'Erreur lors de la création', 'error');
+        this.isSavingUser = false;
+      }
+    });
+  }
+
+  deleteSubject(id: string, isStatic: boolean) {
+    if (isStatic) return;
     if (confirm('Supprimer cette matière ?')) {
-      // ✅ Utilisation UNIQUEMENT de l'API Render
       this.http.delete(`${this.API_BASE_URL}/subjects/${id}`).subscribe({
         next: () => {
           this.notifService.show('Matière supprimée', 'success');
@@ -309,7 +399,7 @@ constructor(
 
   saveSubject() {
     if (!this.newSubject.nom || !this.newSubject.prof || !this.newSubject.image) {
-      this.notifService.show('Champs requis manquants', 'error');
+      this.notifService.show('Tous les champs sont requis', 'error');
       return;
     }
 
@@ -357,7 +447,8 @@ constructor(
   resetForm() {
     this.newAssignment = {
       nom: '', auteur: '', matiere: '', prof: '', note: null,
-      dateDeRendu: '', imageMatiere: '', rendu: false, remarques: '', priorite: 'moyenne'
+      dateDeRendu: '', imageMatiere: '', rendu: false, remarques: '', priorite: 'moyenne',
+      noteAttribuee: false
     };
     this.isEditMode = false;
     this.currentEditId = '';
@@ -366,26 +457,28 @@ constructor(
 
   onSaveAssignment() {
     if (!this.newAssignment.nom || !this.newAssignment.auteur) return;
+
+    if (this.auth.isAdmin() && (this.newAssignment.note !== null && this.newAssignment.note !== undefined)) {
+      this.newAssignment.noteAttribuee = true;
+    }
+
     const action = this.isEditMode
       ? this.assignmentService.updateAssignment(this.currentEditId, this.newAssignment)
       : this.assignmentService.addAssignment(this.newAssignment);
 
     action.subscribe(() => {
-      setTimeout(() => {
-        this.notifService.show(this.isEditMode ? 'Mis à jour' : 'Créé', 'success');
-        this.closeModal();
-        this.refreshAssignments();
-      });
+      this.notifService.show(this.isEditMode ? 'Mis à jour' : 'Créé', 'success');
+      this.closeModal();
+      this.refreshAssignments();
+      if (this.auth.isAdmin()) this.checkNewSubmissions();
     });
   }
 
   onDeleteAssignment(id: string) {
     if (confirm('Supprimer ?')) {
       this.assignmentService.deleteAssignment(id).subscribe(() => {
-        setTimeout(() => {
-          this.notifService.show('Supprimé', 'info');
-          this.refreshAssignments();
-        });
+        this.notifService.show('Supprimé', 'info');
+        this.refreshAssignments();
       });
     }
   }
